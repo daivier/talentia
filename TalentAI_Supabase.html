@@ -1,0 +1,1466 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TalentAI — Com Supabase</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --accent:#1a56a0;--accent-l:#e8f0fb;--accent-d:#0d3d7a;
+  --success:#2d6a0f;--success-l:#e6f4dc;
+  --warn:#a05c0a;--warn-l:#fdf0dc;
+  --danger:#991f1f;--danger-l:#fdeaea;
+  --purple:#4e3fb5;--purple-l:#eeecfd;
+  --teal:#0a6655;--teal-l:#e0f5f0;
+  --bg:#f7f6f2;--card:#fff;
+  --border:rgba(0,0,0,0.08);--border-m:rgba(0,0,0,0.14);
+  --text:#1a1917;--muted:#6b6962;--hint:#9e9b94;
+  --font:'DM Sans',sans-serif;
+  --r-sm:6px;--r-md:10px;--r-lg:14px;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+  --sh-md:0 4px 12px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);color:var(--text);background:var(--bg);font-size:14px;line-height:1.5;}
+button,input,select,textarea{font-family:var(--font);}
+button{cursor:pointer;}
+
+/* SETUP SCREEN */
+#setup-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+.setup-card{background:var(--card);border-radius:var(--r-lg);border:1px solid var(--border);padding:2rem;max-width:480px;width:100%;margin:1rem;box-shadow:var(--sh-md);}
+.setup-logo{display:flex;align-items:center;gap:8px;margin-bottom:1.5rem;}
+.setup-logo-box{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;}
+.setup-logo-box i{color:#fff;font-size:16px;}
+.setup-title{font-size:18px;font-weight:600;}
+.step-block{margin-bottom:1.25rem;}
+.step-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;font-weight:700;margin-right:6px;flex-shrink:0;}
+.step-title{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;}
+.step-desc{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px;}
+.code-block{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;font-family:monospace;font-size:11px;line-height:1.6;overflow-x:auto;position:relative;}
+.copy-btn{position:absolute;top:6px;right:6px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;}
+.copy-btn:hover{background:var(--border);}
+.form-row{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:8px;}
+.form-label{font-size:11px;font-weight:500;color:var(--muted);margin-bottom:4px;display:block;}
+.form-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-md);font-size:13px;color:var(--text);background:#fff;}
+.form-input:focus{outline:none;border-color:var(--accent);}
+.form-input::placeholder{color:var(--hint);}
+.btn-connect{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-md);font-size:14px;font-weight:500;margin-top:4px;}
+.btn-connect:hover{background:var(--accent-d);}
+.conn-status{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--r-md);font-size:13px;margin-bottom:12px;}
+.conn-status.testing{background:#fdf0dc;color:#a05c0a;}
+.conn-status.ok{background:var(--success-l);color:var(--success);}
+.conn-status.err{background:var(--danger-l);color:var(--danger);}
+.tip-box{background:var(--accent-l);border-radius:var(--r-sm);padding:10px 12px;font-size:11px;color:var(--accent-d);line-height:1.6;margin-bottom:12px;}
+.tip-box a{color:var(--accent);text-decoration:underline;}
+
+/* APP — same styles as before */
+#app-screen{display:none;flex-direction:row;min-height:100vh;}
+.sidebar{width:220px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;}
+.sb-logo{display:flex;align-items:center;gap:8px;padding:1rem 1rem .75rem;border-bottom:1px solid var(--border);}
+.sb-logo-box{width:28px;height:28px;border-radius:7px;background:var(--accent);display:flex;align-items:center;justify-content:center;}
+.sb-logo-box i{color:#fff;font-size:14px;}
+.sb-logo-name{font-size:15px;font-weight:600;}
+.sb-scroll{flex:1;overflow-y:auto;padding:.75rem .5rem;}
+.sb-section{margin-bottom:.75rem;}
+.sb-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--hint);padding:0 8px 4px;}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:var(--r-md);font-size:13px;color:var(--muted);cursor:pointer;transition:all .12s;margin-bottom:1px;border:none;background:none;width:100%;text-align:left;}
+.nav-item:hover{background:var(--bg);color:var(--text);}
+.nav-item.active{background:var(--accent-l);color:var(--accent);font-weight:500;}
+.nav-item i{font-size:16px;flex-shrink:0;}
+.nav-badge{margin-left:auto;font-size:10px;font-weight:600;padding:1px 6px;border-radius:20px;background:var(--bg);color:var(--muted);}
+.nav-item.active .nav-badge{background:rgba(26,86,160,.15);color:var(--accent);}
+.sb-user{padding:.75rem 1rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.sb-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;}
+.sb-name{font-size:12px;font-weight:500;}
+.sb-role{font-size:10px;color:var(--muted);}
+.logout-btn{margin-left:auto;background:none;border:none;color:var(--hint);cursor:pointer;padding:4px;}
+.logout-btn:hover{color:var(--danger);}
+.main-area{flex:1;overflow-y:auto;}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 1.5rem;border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;z-index:50;}
+.db-pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:500;}
+.view{display:none;padding:1.5rem;}
+.view.active{display:block;}
+.page-hd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem;gap:12px;}
+.page-title{font-size:20px;font-weight:600;letter-spacing:-.3px;margin-bottom:2px;}
+.page-sub{font-size:13px;color:var(--muted);}
+.page-actions{display:flex;gap:8px;flex-shrink:0;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--r-md);font-size:13px;font-weight:500;border:none;transition:all .12s;cursor:pointer;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--accent-d);}
+.btn-ghost{background:var(--card);color:var(--text);border:1px solid var(--border);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn i{font-size:15px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.25rem;box-shadow:var(--sh);}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+.card-title{font-size:14px;font-weight:600;}
+.card-action{font-size:12px;color:var(--accent);cursor:pointer;}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.25rem;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:1rem 1.1rem;box-shadow:var(--sh);}
+.stat-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);margin-bottom:6px;}
+.stat-value{font-size:26px;font-weight:600;letter-spacing:-.5px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.tag{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:500;padding:2px 8px;border-radius:20px;}
+.tag-blue{background:var(--accent-l);color:var(--accent);}
+.tag-green{background:var(--success-l);color:var(--success);}
+.tag-warn{background:var(--warn-l);color:var(--warn);}
+.tag-red{background:var(--danger-l);color:var(--danger);}
+.tag-gray{background:var(--bg);color:var(--muted);border:1px solid var(--border);}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);padding:0 12px 10px;text-align:left;border-bottom:1px solid var(--border);}
+.tbl td{padding:10px 12px;border-bottom:1px solid var(--border);}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:var(--bg);}
+.av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;flex-shrink:0;background:var(--accent-l);color:var(--accent);}
+.ai-insight{display:flex;gap:10px;align-items:flex-start;background:var(--accent-l);border:1px solid rgba(26,86,160,.2);border-radius:var(--r-md);padding:10px 14px;margin-bottom:1.25rem;}
+.ai-insight i{font-size:16px;color:var(--accent);flex-shrink:0;margin-top:1px;}
+.ai-insight-text{font-size:12px;line-height:1.6;color:var(--accent-d);}
+.search-row{display:flex;gap:8px;margin-bottom:1rem;}
+.search-wrap{flex:1;position:relative;}
+.search-wrap i{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--hint);pointer-events:none;}
+.search-input{width:100%;padding:8px 10px 8px 32px;border:1px solid var(--border);border-radius:var(--r-md);font-size:13px;color:var(--text);background:var(--card);}
+.search-input:focus{outline:none;border-color:var(--accent);}
+.prog-bg{height:5px;background:var(--bg);border-radius:20px;}
+.prog-fill{height:5px;border-radius:20px;}
+.form-group{margin-bottom:12px;}
+.form-label-sm{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:5px;}
+.f-input{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-md);font-size:13px;color:var(--text);background:#fff;}
+.f-input:focus{outline:none;border-color:var(--accent);}
+.f-input::placeholder{color:var(--hint);}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--card);border-radius:var(--r-lg);width:90%;max-width:540px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.15);}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+.modal-title{font-size:15px;font-weight:600;}
+.modal-close{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;}
+.modal-body{padding:20px;}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+.empty-state{text-align:center;padding:3rem;color:var(--muted);}
+.empty-state i{font-size:40px;display:block;margin-bottom:12px;color:var(--hint);}
+.loading{display:flex;align-items:center;gap:8px;padding:1rem;color:var(--muted);font-size:13px;}
+.loading i{animation:spin 1s linear infinite;font-size:16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--text);color:var(--card);padding:10px 16px;border-radius:var(--r-md);font-size:13px;z-index:9999;animation:slideIn .2s ease;box-shadow:var(--sh-md);}
+.toast.success{background:var(--success);}
+.toast.error{background:var(--danger);}
+@keyframes slideIn{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- ==================== SETUP ==================== -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <div class="setup-logo">
+      <div class="setup-logo-box"><i class="ti ti-brain"></i></div>
+      <span class="setup-title">TalentAI — Configuração do banco</span>
+    </div>
+
+    <div class="tip-box">
+      <strong>Como funciona:</strong> O TalentAI usa <a href="https://supabase.com" target="_blank">Supabase</a> como banco de dados PostgreSQL. Em poucos minutos você terá dados reais, autenticação e persistência completa.
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">1</span> Crie um projeto Supabase gratuito</div>
+      <div class="step-desc">Acesse <a href="https://supabase.com" target="_blank" style="color:var(--accent)">supabase.com</a> → New Project. Escolha um nome (ex: "talentai") e uma senha forte.</div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">2</span> Execute o schema SQL</div>
+      <div class="step-desc">No Supabase, vá em <strong>SQL Editor → New Query</strong> e cole o conteúdo do arquivo <code>supabase_schema.sql</code> que acompanha este sistema. Clique em <strong>Run</strong>.</div>
+      <div style="background:var(--success-l);border-radius:var(--r-sm);padding:8px 10px;font-size:11px;color:var(--success);margin-top:4px">
+        <i class="ti ti-check" style="font-size:13px;vertical-align:-2px"></i>
+        Isso cria 13 tabelas, views, RLS e dados de exemplo automaticamente.
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">3</span> Cole suas credenciais</div>
+      <div class="step-desc">Em <strong>Settings → API</strong> do seu projeto Supabase, copie a URL e a chave <code>anon public</code>.</div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">Project URL</label>
+          <input class="form-input" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off">
+        </div>
+        <div>
+          <label class="form-label">Anon Key (public)</label>
+          <input class="form-input" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <div id="conn-status" style="display:none"></div>
+
+    <button class="btn-connect" onclick="connectSupabase()">
+      <i class="ti ti-plug" style="font-size:15px;margin-right:5px"></i>
+      Conectar e entrar no sistema
+    </button>
+
+    <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--hint)">
+      Suas credenciais ficam salvas apenas no <code>localStorage</code> do navegador.
+    </div>
+
+    <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px;">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);margin-bottom:8px">Quer ver sem configurar? Use o modo demo</div>
+      <button class="btn-connect" style="background:var(--bg);color:var(--text);border:1px solid var(--border)" onclick="enterDemoMode()">
+        <i class="ti ti-flask" style="font-size:15px;margin-right:5px"></i>
+        Entrar no modo demo (dados locais)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== APP ==================== -->
+<div id="app-screen">
+  <div class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-box"><i class="ti ti-brain"></i></div>
+      <span class="sb-logo-name">TalentAI</span>
+    </div>
+    <div class="sb-scroll">
+      <div class="sb-section">
+        <div class="sb-label">Recrutamento</div>
+        <button class="nav-item active" onclick="openView('v-dash')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
+        <button class="nav-item" onclick="openView('v-vagas')"><i class="ti ti-briefcase"></i>Vagas</button>
+        <button class="nav-item" onclick="openView('v-candidatos')"><i class="ti ti-users"></i>Candidatos</button>
+        <button class="nav-item" onclick="openView('v-pipeline')"><i class="ti ti-git-pull-request"></i>Pipeline</button>
+        <button class="nav-item" onclick="openView('v-entrevistas')"><i class="ti ti-calendar-event"></i>Entrevistas</button>
+        <button class="nav-item" onclick="openView('v-ofertas')"><i class="ti ti-award"></i>Ofertas</button>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">IA & Análise</div>
+        <button class="nav-item" onclick="openView('v-ia')"><i class="ti ti-sparkles"></i>Assistente IA</button>
+        <button class="nav-item" onclick="openView('v-relatorios')"><i class="ti ti-chart-pie"></i>Relatórios</button>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Comunicação</div>
+        <button class="nav-item" onclick="openView('v-mensagens')"><i class="ti ti-message-dots"></i>Mensagens</button>
+        <button class="nav-item" onclick="openView('v-emails')"><i class="ti ti-mail"></i>E-mails auto</button>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">Sistema</div>
+        <button class="nav-item" onclick="openView('v-lgpd')"><i class="ti ti-shield-check"></i>LGPD</button>
+        <button class="nav-item" onclick="openView('v-config')"><i class="ti ti-settings"></i>Configurações</button>
+      </div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-av" id="sb-av">MA</div>
+      <div><div class="sb-name" id="sb-name">Carregando...</div><div class="sb-role" id="sb-role">RH</div></div>
+      <button class="logout-btn" onclick="doLogout()" title="Sair"><i class="ti ti-logout" style="font-size:16px"></i></button>
+    </div>
+  </div>
+
+  <div class="main-area">
+    <div class="topbar">
+      <div style="font-size:12px;color:var(--muted)" id="topbar-breadcrumb">Dashboard</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="db-pill" id="db-pill" style="background:var(--success-l);color:var(--success)">
+          <i class="ti ti-database" style="font-size:13px"></i>
+          <span id="db-pill-text">Supabase conectado</span>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openModal('m-nova-vaga')"><i class="ti ti-plus"></i> Nova vaga</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="view active" id="v-dash">
+      <div class="page-hd">
+        <div><div class="page-title" id="dash-greeting">Bom dia 👋</div><div class="page-sub" id="dash-date"></div></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="loadDashboard()"><i class="ti ti-refresh"></i> Atualizar</button>
+        </div>
+      </div>
+      <div id="dash-insight" class="ai-insight" style="display:none">
+        <i class="ti ti-sparkles"></i><div class="ai-insight-text" id="dash-insight-text"></div>
+      </div>
+      <div class="stats-row" id="dash-stats">
+        <div class="stat"><div class="stat-label">Vagas abertas</div><div class="stat-value"><i class="ti ti-loader-2 loading-icon" style="font-size:20px;animation:spin 1s linear infinite"></i></div></div>
+        <div class="stat"><div class="stat-label">Candidatos</div><div class="stat-value"><i class="ti ti-loader-2 loading-icon" style="font-size:20px;animation:spin 1s linear infinite"></i></div></div>
+        <div class="stat"><div class="stat-label">Entrevistas hoje</div><div class="stat-value"><i class="ti ti-loader-2 loading-icon" style="font-size:20px;animation:spin 1s linear infinite"></i></div></div>
+        <div class="stat"><div class="stat-label">Ofertas ativas</div><div class="stat-value"><i class="ti ti-loader-2 loading-icon" style="font-size:20px;animation:spin 1s linear infinite"></i></div></div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Vagas recentes</div><div class="card-action" onclick="openView('v-vagas')">Ver todas →</div></div>
+          <div id="dash-vagas"><div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Top candidatos</div><div class="card-action" onclick="openView('v-candidatos')">Ver todos →</div></div>
+          <div id="dash-cands"><div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VAGAS -->
+    <div class="view" id="v-vagas">
+      <div class="page-hd">
+        <div><div class="page-title">Vagas</div><div class="page-sub" id="vagas-sub"></div></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="loadVagas()"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-nova-vaga')"><i class="ti ti-plus"></i> Nova vaga</button>
+        </div>
+      </div>
+      <div class="search-row">
+        <div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" id="vagas-search" placeholder="Buscar vagas..." oninput="filterVagas()"></div>
+        <select class="btn btn-ghost btn-sm" id="vagas-status-filter" onchange="filterVagas()" style="border-radius:var(--r-md);font-size:12px">
+          <option value="">Todos status</option><option value="ativa">Ativas</option><option value="pausada">Pausadas</option><option value="encerrada">Encerradas</option>
+        </select>
+      </div>
+      <div class="card"><div id="vagas-tbody-wrap"><div class="loading"><i class="ti ti-loader-2"></i> Carregando vagas...</div></div></div>
+    </div>
+
+    <!-- CANDIDATOS -->
+    <div class="view" id="v-candidatos">
+      <div class="page-hd">
+        <div><div class="page-title">Candidatos</div><div class="page-sub" id="cands-sub"></div></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="loadCandidatos()"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-novo-candidato')"><i class="ti ti-user-plus"></i> Adicionar</button>
+        </div>
+      </div>
+      <div class="search-row">
+        <div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" id="cands-search" placeholder="Buscar candidatos..." oninput="filterCandidatos()"></div>
+        <select class="btn btn-ghost btn-sm" id="cands-etapa-filter" onchange="filterCandidatos()" style="border-radius:var(--r-md);font-size:12px">
+          <option value="">Todas etapas</option>
+          <option value="inscrito">Inscrito</option><option value="triagem_ia">Triagem IA</option>
+          <option value="entrevista_rh">Entrevista RH</option><option value="finalista">Finalista</option>
+          <option value="oferta">Oferta</option><option value="contratado">Contratado</option>
+        </select>
+      </div>
+      <div class="card"><div id="cands-tbody-wrap"><div class="loading"><i class="ti ti-loader-2"></i> Carregando candidatos...</div></div></div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div class="view" id="v-pipeline">
+      <div class="page-hd">
+        <div><div class="page-title">Pipeline</div><div class="page-sub">Visão por etapa de seleção</div></div>
+        <div class="page-actions">
+          <select class="btn btn-ghost btn-sm" id="pipeline-vaga-filter" onchange="loadPipeline()" style="border-radius:var(--r-md);font-size:12px"></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadPipeline()"><i class="ti ti-refresh"></i></button>
+        </div>
+      </div>
+      <div id="pipeline-wrap" style="display:flex;gap:10px;overflow-x:auto;padding-bottom:8px">
+        <div class="loading"><i class="ti ti-loader-2"></i> Carregando pipeline...</div>
+      </div>
+    </div>
+
+    <!-- ENTREVISTAS -->
+    <div class="view" id="v-entrevistas">
+      <div class="page-hd">
+        <div><div class="page-title">Entrevistas</div><div class="page-sub" id="entrev-sub"></div></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="loadEntrevistas()"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-agendar')"><i class="ti ti-plus"></i> Agendar</button>
+        </div>
+      </div>
+      <div id="entrev-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando entrevistas...</div></div>
+    </div>
+
+    <!-- OFERTAS -->
+    <div class="view" id="v-ofertas">
+      <div class="page-hd">
+        <div><div class="page-title">Ofertas</div><div class="page-sub" id="ofertas-sub"></div></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="loadOfertas()"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-nova-oferta')"><i class="ti ti-plus"></i> Nova oferta</button>
+        </div>
+      </div>
+      <div id="ofertas-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando ofertas...</div></div>
+    </div>
+
+    <!-- IA -->
+    <div class="view" id="v-ia">
+      <div class="page-hd"><div><div class="page-title">Assistente IA</div><div class="page-sub">Análise, geração e insights com dados reais do banco</div></div></div>
+      <div class="g2" style="align-items:start">
+        <div style="display:flex;flex-direction:column;height:420px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--success)"></div>
+            <div style="font-size:13px;font-weight:600">TalentAI Assistant</div>
+            <div style="font-size:11px;color:var(--muted);margin-left:auto" id="ia-db-status">Com dados reais do banco</div>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px" id="chat-msgs">
+            <div style="align-self:flex-start;max-width:85%"><div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;line-height:1.6">Olá! Estou conectado ao banco de dados. Posso analisar seus candidatos e vagas reais, gerar insights e muito mais. O que você precisa?</div></div>
+          </div>
+          <div style="display:flex;gap:6px;padding:8px 10px;border-top:1px solid var(--border)">
+            <input style="flex:1;border:1px solid var(--border);border-radius:var(--r-md);padding:7px 10px;font-size:12px;background:var(--bg);color:var(--text)" id="ai-input" placeholder="Pergunte sobre seus candidatos e vagas..." onkeydown="if(event.key==='Enter')sendAI()">
+            <button style="width:32px;height:32px;border-radius:var(--r-md);background:var(--accent);color:#fff;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer" onclick="sendAI()"><i class="ti ti-send" style="font-size:15px"></i></button>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:10px">Contexto do banco</div>
+            <div id="ia-context" style="font-size:11px;color:var(--muted);line-height:1.7">
+              <div class="loading"><i class="ti ti-loader-2"></i> Carregando contexto...</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px">Ações rápidas</div>
+            <button onclick="askAIWithContext('Analise os candidatos com maior score e me dê recomendações de ação')" style="width:100%;text-align:left;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;cursor:pointer;color:var(--text);margin-bottom:5px">Analisar top candidatos ↗</button>
+            <button onclick="askAIWithContext('Quais vagas têm menos candidatos e precisam de atenção?')" style="width:100%;text-align:left;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;cursor:pointer;color:var(--text);margin-bottom:5px">Vagas com poucos candidatos ↗</button>
+            <button onclick="askAIWithContext('Gere um relatório executivo do pipeline atual')" style="width:100%;text-align:left;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);font-size:11px;cursor:pointer;color:var(--text)">Relatório executivo ↗</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RELATÓRIOS -->
+    <div class="view" id="v-relatorios">
+      <div class="page-hd">
+        <div><div class="page-title">Relatórios</div><div class="page-sub">Dados em tempo real do Supabase</div></div>
+        <div class="page-actions"><button class="btn btn-ghost btn-sm" onclick="loadRelatorios()"><i class="ti ti-refresh"></i> Atualizar</button></div>
+      </div>
+      <div id="relat-stats" class="stats-row"></div>
+      <div class="g2">
+        <div class="card"><div class="card-hd"><div class="card-title">Candidatos por etapa</div></div><div id="relat-etapas"></div></div>
+        <div class="card"><div class="card-hd"><div class="card-title">Vagas por área</div></div><div id="relat-areas"></div></div>
+      </div>
+    </div>
+
+    <!-- MENSAGENS -->
+    <div class="view" id="v-mensagens">
+      <div class="page-hd"><div><div class="page-title">Mensagens</div><div class="page-sub">Comunicação com candidatos</div></div></div>
+      <div class="g2" style="align-items:start">
+        <div class="card" style="padding:.75rem">
+          <div id="msgs-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div></div>
+        </div>
+        <div class="card" id="msg-chat-panel">
+          <div class="empty-state"><i class="ti ti-message-dots"></i><div style="font-size:13px">Selecione uma conversa</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EMAILS -->
+    <div class="view" id="v-emails">
+      <div class="page-hd">
+        <div><div class="page-title">E-mails automáticos</div><div class="page-sub">Templates salvos no banco · Gatilhos automáticos</div></div>
+        <div class="page-actions"><button class="btn btn-primary btn-sm" onclick="openModal('m-email-template')"><i class="ti ti-plus"></i> Novo template</button></div>
+      </div>
+      <div class="g2" style="align-items:start">
+        <div><div id="email-templates-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando templates...</div></div></div>
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Editor</div><div class="card-action" onclick="genEmailAI()">Gerar IA ✨</div></div>
+          <div class="form-group"><label class="form-label-sm">Gatilho</label><select class="f-input" id="et-gatilho"><option value="candidatura_recebida">Candidatura recebida</option><option value="candidato_aprovado">Candidato aprovado</option><option value="feedback_reprovacao">Feedback reprovação</option><option value="convite_entrevista">Convite entrevista</option></select></div>
+          <div class="form-group"><label class="form-label-sm">Assunto</label><input class="f-input" id="et-assunto" placeholder="Assunto do e-mail"></div>
+          <div class="form-group"><label class="form-label-sm">Corpo</label><textarea class="f-input" id="et-corpo" rows="6" placeholder="Conteúdo do e-mail..."></textarea></div>
+          <div id="et-ai-preview" style="display:none;background:var(--accent-l);border-radius:var(--r-sm);padding:10px;font-size:12px;color:var(--accent-d);margin-bottom:10px;line-height:1.6"></div>
+          <button class="btn btn-primary btn-sm" style="width:100%" onclick="saveEmailTemplate()"><i class="ti ti-device-floppy"></i> Salvar no banco</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LGPD -->
+    <div class="view" id="v-lgpd">
+      <div class="page-hd"><div><div class="page-title">LGPD & Privacidade</div><div class="page-sub">Conformidade com dados reais do banco</div></div></div>
+      <div style="background:var(--success-l);border:1px solid rgba(45,106,15,.2);border-radius:var(--r-md);padding:10px 14px;margin-bottom:1.25rem;display:flex;gap:10px;align-items:flex-start">
+        <i class="ti ti-shield-check" style="font-size:16px;color:var(--success);flex-shrink:0;margin-top:1px"></i>
+        <div style="font-size:12px;line-height:1.6;color:#1a3d12">RLS (Row Level Security) ativo no Supabase. Cada usuário acessa apenas os dados da sua empresa. Criptografia TLS em trânsito e AES-256 em repouso.</div>
+      </div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Candidatos com consentimento</div></div>
+          <div id="lgpd-stats"><div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div></div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Políticas RLS ativas</div></div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--success-l);border-radius:var(--r-sm)"><i class="ti ti-shield-check" style="color:var(--success);font-size:15px"></i><span style="font-size:12px">Vagas: acesso por empresa</span></div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--success-l);border-radius:var(--r-sm)"><i class="ti ti-shield-check" style="color:var(--success);font-size:15px"></i><span style="font-size:12px">Candidaturas: acesso por empresa</span></div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--success-l);border-radius:var(--r-sm)"><i class="ti ti-shield-check" style="color:var(--success);font-size:15px"></i><span style="font-size:12px">Notificações: acesso individual</span></div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--success-l);border-radius:var(--r-sm)"><i class="ti ti-shield-check" style="color:var(--success);font-size:15px"></i><span style="font-size:12px">Vagas públicas: somente leitura (anon)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div class="view" id="v-config">
+      <div class="page-hd"><div><div class="page-title">Configurações</div><div class="page-sub">Conexão Supabase e preferências</div></div></div>
+      <div class="g2" style="align-items:start">
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Conexão com Supabase</div></div>
+          <div id="config-status" class="conn-status ok" style="margin-bottom:12px">
+            <i class="ti ti-circle-check" style="font-size:16px"></i>
+            <span>Conectado com sucesso</span>
+          </div>
+          <div class="form-group"><label class="form-label-sm">Project URL</label><input class="f-input" id="cfg-url" readonly></div>
+          <div class="form-group"><label class="form-label-sm">Anon Key</label><input class="f-input" id="cfg-key" type="password" readonly></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-ghost btn-sm" onclick="testConnection()"><i class="ti ti-plug"></i> Testar conexão</button>
+            <button class="btn btn-danger btn-sm" onclick="resetConnection()" style="background:var(--danger-l);color:var(--danger);border:none"><i class="ti ti-unlink"></i> Desconectar</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><div class="card-title">Status do banco</div></div>
+          <div id="db-status-detail"><div class="loading"><i class="ti ti-loader-2"></i> Verificando...</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="m-nova-vaga">
+  <div class="modal-box">
+    <div class="modal-hd"><div class="modal-title">Nova vaga</div><button class="modal-close" onclick="closeModal('m-nova-vaga')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label-sm">Cargo *</label><input class="f-input" id="nv-titulo" placeholder="Ex: Engenheiro de Software Sênior"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Área *</label><input class="f-input" id="nv-area" placeholder="Ex: Tecnologia"></div>
+        <div class="form-group"><label class="form-label-sm">Modalidade *</label><select class="f-input" id="nv-modalidade"><option value="remoto">Remoto</option><option value="hibrido">Híbrido</option><option value="presencial">Presencial</option></select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Contrato *</label><select class="f-input" id="nv-contrato"><option value="clt">CLT</option><option value="pj">PJ</option><option value="estagio">Estágio</option></select></div>
+        <div class="form-group"><label class="form-label-sm">Salário máx</label><input class="f-input" id="nv-salario" type="number" placeholder="Ex: 20000"></div>
+      </div>
+      <div class="form-group"><label class="form-label-sm">Descrição</label><textarea class="f-input" id="nv-descricao" rows="4" placeholder="Descreva a vaga..."></textarea></div>
+      <div class="form-group"><label class="form-label-sm">Tags (separadas por vírgula)</label><input class="f-input" id="nv-tags" placeholder="Ex: Java, Kafka, AWS"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-nova-vaga')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveVaga()"><i class="ti ti-device-floppy"></i> Salvar no banco</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-novo-candidato">
+  <div class="modal-box">
+    <div class="modal-hd"><div class="modal-title">Adicionar candidato</div><button class="modal-close" onclick="closeModal('m-novo-candidato')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Nome *</label><input class="f-input" id="nc-nome" placeholder="Nome completo"></div>
+        <div class="form-group"><label class="form-label-sm">E-mail *</label><input class="f-input" id="nc-email" type="email" placeholder="email@exemplo.com"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Telefone</label><input class="f-input" id="nc-telefone" placeholder="(11) 99999-0000"></div>
+        <div class="form-group"><label class="form-label-sm">LinkedIn</label><input class="f-input" id="nc-linkedin" placeholder="linkedin.com/in/..."></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Localização</label><input class="f-input" id="nc-local" placeholder="São Paulo, SP"></div>
+        <div class="form-group"><label class="form-label-sm">Exp. (anos)</label><input class="f-input" id="nc-exp" type="number" placeholder="5"></div>
+      </div>
+      <div class="form-group"><label class="form-label-sm">Habilidades (separadas por vírgula)</label><input class="f-input" id="nc-skills" placeholder="Java, Python, React..."></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:10px;background:var(--accent-l);border-radius:var(--r-sm);font-size:12px;color:var(--accent-d)">
+        <input type="checkbox" id="nc-lgpd" checked>
+        <label for="nc-lgpd">Candidato consentiu com a política de privacidade (LGPD)</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-novo-candidato')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveCandidato()"><i class="ti ti-device-floppy"></i> Salvar no banco</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-agendar">
+  <div class="modal-box">
+    <div class="modal-hd"><div class="modal-title">Agendar entrevista</div><button class="modal-close" onclick="closeModal('m-agendar')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label-sm">Candidatura (vaga + candidato)</label><select class="f-input" id="ag-candidatura"><option value="">Carregando...</option></select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Data</label><input class="f-input" id="ag-data" type="date"></div>
+        <div class="form-group"><label class="form-label-sm">Horário</label><input class="f-input" id="ag-hora" type="time" value="10:00"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Tipo</label><select class="f-input" id="ag-tipo"><option value="rh">RH</option><option value="tecnica">Técnica</option><option value="final">Final</option></select></div>
+        <div class="form-group"><label class="form-label-sm">Formato</label><select class="f-input" id="ag-formato"><option value="video">Videoconferência</option><option value="presencial">Presencial</option></select></div>
+      </div>
+      <div class="form-group"><label class="form-label-sm">Link de videoconferência</label><input class="f-input" id="ag-link" placeholder="https://meet.google.com/..."></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-agendar')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEntrevista()"><i class="ti ti-calendar-plus"></i> Agendar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-nova-oferta">
+  <div class="modal-box">
+    <div class="modal-hd"><div class="modal-title">Nova oferta</div><button class="modal-close" onclick="closeModal('m-nova-oferta')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label-sm">Candidatura</label><select class="f-input" id="of-candidatura"><option value="">Carregando...</option></select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Salário (R$)</label><input class="f-input" id="of-salario" type="number" placeholder="20000"></div>
+        <div class="form-group"><label class="form-label-sm">Bônus signing</label><input class="f-input" id="of-bonus" type="number" placeholder="0"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group"><label class="form-label-sm">Data de início</label><input class="f-input" id="of-inicio" type="date"></div>
+        <div class="form-group"><label class="form-label-sm">Validade da oferta</label><input class="f-input" id="of-validade" type="date"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-nova-oferta')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveOferta()"><i class="ti ti-device-floppy"></i> Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-vincular-vaga">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-hd"><div class="modal-title">Vincular candidato à vaga</div><button class="modal-close" onclick="closeModal('m-vincular-vaga')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="vincular-candidato-id">
+      <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg);border-radius:var(--r-md);margin-bottom:14px">
+        <div class="av" id="vincular-candidato-av">?</div>
+        <div>
+          <div style="font-size:13px;font-weight:500" id="vincular-candidato-nome">Candidato</div>
+          <div style="font-size:11px;color:var(--muted)">Banco de talentos → vinculando à vaga</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label-sm">Selecione a vaga *</label>
+        <select class="f-input" id="vincular-vaga-select"><option>Carregando vagas...</option></select>
+      </div>
+      <div style="background:var(--accent-l);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;color:var(--accent-d);line-height:1.5">
+        <i class="ti ti-info-circle" style="font-size:14px;vertical-align:-2px"></i>
+        O candidato entrará na etapa <strong>Inscrito</strong> e poderá ser avançado pelo pipeline normalmente.
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-vincular-vaga')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="salvarVinculo()"><i class="ti ti-link"></i> Vincular à vaga</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-email-template">
+  <div class="modal-box">
+    <div class="modal-hd"><div class="modal-title">Novo template de e-mail</div><button class="modal-close" onclick="closeModal('m-email-template')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label-sm">Gatilho</label><select class="f-input" id="net-gatilho"><option>candidatura_recebida</option><option>candidato_aprovado</option><option>feedback_reprovacao</option></select></div>
+      <div class="form-group"><label class="form-label-sm">Assunto</label><input class="f-input" id="net-assunto"></div>
+      <div class="form-group"><label class="form-label-sm">Corpo</label><textarea class="f-input" id="net-corpo" rows="5"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-email-template')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEmailTemplateModal()"><i class="ti ti-device-floppy"></i> Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SUPABASE CLIENT
+// ============================================================
+var sb = null;
+var EMPRESA_ID = 'a0000000-0000-0000-0000-000000000001';
+var demoMode = false;
+
+function initSupabase(url, key) {
+  sb = supabase.createClient(url, key);
+}
+
+async function connectSupabase() {
+  var url = document.getElementById('sb-url').value.trim();
+  var key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { showStatus('conn-status','err','Preencha a URL e a chave'); return; }
+  showStatus('conn-status','testing','Testando conexão...');
+  try {
+    initSupabase(url, key);
+    var { data, error } = await sb.from('empresas').select('id').limit(1);
+    if (error) throw error;
+    localStorage.setItem('sb_url', url);
+    localStorage.setItem('sb_key', key);
+    showStatus('conn-status','ok','Conectado! Entrando no sistema...');
+    setTimeout(() => enterApp(), 800);
+  } catch(e) {
+    showStatus('conn-status','err', 'Erro: ' + (e.message || 'Verifique URL e chave'));
+  }
+}
+
+function showStatus(elId, type, msg) {
+  var el = document.getElementById(elId);
+  el.style.display = 'flex';
+  el.className = 'conn-status ' + type;
+  var icons = {testing:'ti-loader-2',ok:'ti-circle-check',err:'ti-circle-x'};
+  el.innerHTML = `<i class="ti ${icons[type]}" style="font-size:16px${type==='testing'?';animation:spin 1s linear infinite':''}"></i> ${msg}`;
+}
+
+function enterDemoMode() {
+  demoMode = true;
+  enterApp();
+}
+
+function enterApp() {
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'flex';
+  if (!sb && !demoMode) {
+    var url = localStorage.getItem('sb_url');
+    var key = localStorage.getItem('sb_key');
+    if (url && key) initSupabase(url, key);
+  }
+  if (demoMode) {
+    document.getElementById('db-pill').style.background = '#fdf0dc';
+    document.getElementById('db-pill').style.color = '#a05c0a';
+    document.getElementById('db-pill-text').textContent = 'Modo demo';
+  }
+  loadDashboard();
+  setDashGreeting();
+  loadCandidaturas_forSelects();
+}
+
+function doLogout() {
+  document.getElementById('setup-screen').style.display = 'flex';
+  document.getElementById('app-screen').style.display = 'none';
+  sb = null; demoMode = false;
+}
+
+function resetConnection() {
+  localStorage.removeItem('sb_url');
+  localStorage.removeItem('sb_key');
+  doLogout();
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function openView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  var navMap = {'v-dash':0,'v-vagas':1,'v-candidatos':2,'v-pipeline':3,'v-entrevistas':4,'v-ofertas':5,'v-ia':6,'v-relatorios':7,'v-mensagens':8,'v-emails':9,'v-lgpd':10,'v-config':11};
+  var items = document.querySelectorAll('.nav-item');
+  if (navMap[id] !== undefined) items[navMap[id]].classList.add('active');
+  var labels = {'v-dash':'Dashboard','v-vagas':'Vagas','v-candidatos':'Candidatos','v-pipeline':'Pipeline','v-entrevistas':'Entrevistas','v-ofertas':'Ofertas','v-ia':'Assistente IA','v-relatorios':'Relatórios','v-mensagens':'Mensagens','v-emails':'E-mails','v-lgpd':'LGPD','v-config':'Configurações'};
+  document.getElementById('topbar-breadcrumb').textContent = labels[id] || '';
+  var loaders = {'v-vagas':loadVagas,'v-candidatos':loadCandidatos,'v-pipeline':loadPipeline,'v-entrevistas':loadEntrevistas,'v-ofertas':loadOfertas,'v-relatorios':loadRelatorios,'v-emails':loadEmailTemplates,'v-mensagens':loadMensagens,'v-lgpd':loadLGPD,'v-config':loadConfig,'v-ia':loadIAContext};
+  if (loaders[id]) loaders[id]();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if(e.target===m) m.classList.remove('open'); }));
+
+function toast(msg, type='') {
+  var t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function initials(name) {
+  return (name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+}
+
+function etapaLabel(e) {
+  var m = {inscrito:'Inscrito',triagem_ia:'Triagem IA',entrevista_rh:'Ent. RH',entrevista_tecnica:'Técnica',finalista:'Finalista',oferta:'Oferta',contratado:'Contratado',reprovado:'Reprovado'};
+  return m[e] || e;
+}
+
+function etapaTag(e) {
+  var m = {inscrito:'tag-blue',triagem_ia:'tag-purple',entrevista_rh:'tag-blue',entrevista_tecnica:'tag-teal',finalista:'tag-green',oferta:'tag-green',contratado:'tag-green',reprovado:'tag-red'};
+  return m[e] || 'tag-gray';
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit',year:'2-digit'});
+}
+
+function setDashGreeting() {
+  var h = new Date().getHours();
+  var g = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+  document.getElementById('dash-greeting').textContent = g + ' 👋';
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('pt-BR', {weekday:'long',day:'numeric',month:'long'});
+}
+
+// DEMO DATA
+var DEMO = {
+  vagas: [
+    {id:'1',titulo:'Engenheiro Backend Sênior',area:'Tecnologia',modalidade:'remoto',tipo_contrato:'clt',salario_max:25000,status:'ativa',tags:['Java','Kafka'],created_at:new Date().toISOString()},
+    {id:'2',titulo:'Product Designer',area:'Design',modalidade:'hibrido',tipo_contrato:'pj',salario_max:16000,status:'ativa',tags:['Figma','UX'],created_at:new Date().toISOString()},
+    {id:'3',titulo:'Data Scientist',area:'Tecnologia',modalidade:'remoto',tipo_contrato:'clt',salario_max:20000,status:'ativa',tags:['Python','ML'],created_at:new Date().toISOString()},
+  ],
+  candidaturas: [
+    {id:'c1',candidato_nome:'Lucas Ferreira',candidato_email:'lucas@demo.com',vaga_titulo:'Engenheiro Backend Sênior',etapa:'entrevista_tecnica',score_ia:94,aplicado_em:new Date().toISOString()},
+    {id:'c2',candidato_nome:'Ana Carolina',candidato_email:'ana@demo.com',vaga_titulo:'Product Designer',etapa:'finalista',score_ia:91,aplicado_em:new Date().toISOString()},
+    {id:'c3',candidato_nome:'Rafael Mendes',candidato_email:'rafael@demo.com',vaga_titulo:'Data Scientist',etapa:'triagem_ia',score_ia:88,aplicado_em:new Date().toISOString()},
+    {id:'c4',candidato_nome:'Carla Lima',candidato_email:'carla@demo.com',vaga_titulo:'Engenheiro Backend Sênior',etapa:'entrevista_rh',score_ia:84,aplicado_em:new Date().toISOString()},
+  ],
+  entrevistas: [
+    {id:'e1',candidato_nome:'Ana Carolina',vaga_titulo:'Product Designer',data_hora:new Date().toISOString(),tipo:'rh',formato:'video',status:'agendada'},
+    {id:'e2',candidato_nome:'Lucas Ferreira',vaga_titulo:'Eng. Backend',data_hora:new Date(Date.now()+86400000).toISOString(),tipo:'tecnica',formato:'video',status:'agendada'},
+  ],
+  templates: [
+    {id:'t1',gatilho:'candidatura_recebida',assunto:'Candidatura para {cargo} recebida',corpo:'Olá {nome}, recebemos sua candidatura!'},
+    {id:'t2',gatilho:'candidato_aprovado',assunto:'Ótimas notícias para {cargo}',corpo:'Olá {nome}, gostaríamos de avançar!'},
+    {id:'t3',gatilho:'feedback_reprovacao',assunto:'Atualização sobre {cargo}',corpo:'Olá {nome}, agradecemos seu interesse...'},
+  ]
+};
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+async function loadDashboard() {
+  if (demoMode) { loadDashboardDemo(); return; }
+  try {
+    var [vagas, cands, entrev, ofertas] = await Promise.all([
+      sb.from('vagas').select('*',{count:'exact'}).eq('empresa_id',EMPRESA_ID).eq('status','ativa'),
+      sb.from('v_pipeline').select('*',{count:'exact'}).limit(1),
+      sb.from('entrevistas').select('*',{count:'exact'}).gte('data_hora',new Date().toISOString().split('T')[0]).lt('data_hora',new Date(Date.now()+86400000).toISOString().split('T')[0]),
+      sb.from('ofertas').select('*',{count:'exact'}).eq('status','pendente'),
+    ]);
+    document.getElementById('dash-stats').innerHTML = `
+      <div class="stat"><div class="stat-label">Vagas abertas</div><div class="stat-value">${vagas.count||0}</div></div>
+      <div class="stat"><div class="stat-label">Candidatos</div><div class="stat-value">${cands.count||0}</div></div>
+      <div class="stat"><div class="stat-label">Entrevistas hoje</div><div class="stat-value">${entrev.count||0}</div></div>
+      <div class="stat"><div class="stat-label">Ofertas ativas</div><div class="stat-value">${ofertas.count||0}</div></div>`;
+
+    var vagasData = await sb.from('vagas').select('titulo,status,created_at').eq('empresa_id',EMPRESA_ID).order('created_at',{ascending:false}).limit(4);
+    document.getElementById('dash-vagas').innerHTML = (vagasData.data||[]).map(v=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:13px;font-weight:500">${v.titulo}</span>
+        <span class="tag tag-green">${v.status}</span>
+      </div>`).join('') || '<div class="empty-state"><i class="ti ti-briefcase"></i>Nenhuma vaga</div>';
+
+    var candsData = await sb.from('v_pipeline').select('*').order('score_ia',{ascending:false}).limit(4);
+    document.getElementById('dash-cands').innerHTML = (candsData.data||[]).map(c=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <div class="av">${initials(c.candidato_nome)}</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:500">${c.candidato_nome}</div><div style="font-size:11px;color:var(--muted)">${c.vaga_titulo}</div></div>
+        <span style="font-size:13px;font-weight:600;color:${c.score_ia>=85?'var(--success)':'var(--warn)'}">${c.score_ia||'?'}%</span>
+      </div>`).join('') || '<div class="empty-state"><i class="ti ti-users"></i>Nenhum candidato</div>';
+  } catch(e) { toast('Erro ao carregar dashboard: '+e.message,'error'); }
+}
+
+function loadDashboardDemo() {
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat"><div class="stat-label">Vagas abertas</div><div class="stat-value">${DEMO.vagas.length}</div></div>
+    <div class="stat"><div class="stat-label">Candidatos</div><div class="stat-value">${DEMO.candidaturas.length}</div></div>
+    <div class="stat"><div class="stat-label">Entrevistas hoje</div><div class="stat-value">${DEMO.entrevistas.length}</div></div>
+    <div class="stat"><div class="stat-label">Ofertas ativas</div><div class="stat-value">1</div></div>`;
+  document.getElementById('dash-vagas').innerHTML = DEMO.vagas.map(v=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:13px;font-weight:500">${v.titulo}</span><span class="tag tag-green">ativa</span>
+    </div>`).join('');
+  document.getElementById('dash-cands').innerHTML = DEMO.candidaturas.map(c=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div class="av">${initials(c.candidato_nome)}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${c.candidato_nome}</div><div style="font-size:11px;color:var(--muted)">${c.vaga_titulo}</div></div>
+      <span style="font-size:13px;font-weight:600;color:${c.score_ia>=85?'var(--success)':'var(--warn)'}">${c.score_ia}%</span>
+    </div>`).join('');
+  loadIAContext();
+}
+
+// ============================================================
+// VAGAS
+// ============================================================
+var vagasCache = [];
+
+async function loadVagas() {
+  document.getElementById('vagas-tbody-wrap').innerHTML = '<div class="loading"><i class="ti ti-loader-2"></i> Carregando vagas...</div>';
+  if (demoMode) { vagasCache = DEMO.vagas; renderVagas(vagasCache); return; }
+  try {
+    var { data, error, count } = await sb.from('vagas').select('*',{count:'exact'}).eq('empresa_id',EMPRESA_ID).order('created_at',{ascending:false});
+    if (error) throw error;
+    vagasCache = data || [];
+    document.getElementById('vagas-sub').textContent = `${count||0} vagas encontradas`;
+    renderVagas(vagasCache);
+  } catch(e) { document.getElementById('vagas-tbody-wrap').innerHTML = `<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+function renderVagas(list) {
+  if (!list.length) { document.getElementById('vagas-tbody-wrap').innerHTML = '<div class="empty-state"><i class="ti ti-briefcase"></i><div>Nenhuma vaga cadastrada</div><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openModal(\'m-nova-vaga\')">+ Nova vaga</button></div>'; return; }
+  document.getElementById('vagas-tbody-wrap').innerHTML = `<table class="tbl"><thead><tr><th>Cargo</th><th>Área</th><th>Modalidade</th><th>Contrato</th><th>Salário máx.</th><th>Status</th><th>Criada</th><th></th></tr></thead><tbody>`+
+    list.map(v=>`<tr>
+      <td style="font-weight:500">${v.titulo}</td>
+      <td><span class="tag tag-gray">${v.area}</span></td>
+      <td><span class="tag tag-blue">${v.modalidade}</span></td>
+      <td><span class="tag tag-gray">${v.tipo_contrato.toUpperCase()}</span></td>
+      <td style="color:var(--success);font-weight:500">${v.salario_max?'R$ '+Number(v.salario_max).toLocaleString('pt-BR'):'—'}</td>
+      <td><span class="tag tag-${v.status==='ativa'?'green':v.status==='pausada'?'warn':'red'}">${v.status}</span></td>
+      <td style="color:var(--muted);font-size:12px">${formatDate(v.created_at)}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="deleteVaga('${v.id}')"><i class="ti ti-trash" style="font-size:13px"></i></button></td>
+    </tr>`).join('')+'</tbody></table>';
+}
+
+function filterVagas() {
+  var q = document.getElementById('vagas-search').value.toLowerCase();
+  var st = document.getElementById('vagas-status-filter').value;
+  renderVagas(vagasCache.filter(v => (!q||v.titulo.toLowerCase().includes(q)||v.area.toLowerCase().includes(q)) && (!st||v.status===st)));
+}
+
+async function saveVaga() {
+  var titulo = document.getElementById('nv-titulo').value.trim();
+  var area = document.getElementById('nv-area').value.trim();
+  if (!titulo || !area) { toast('Preencha os campos obrigatórios','error'); return; }
+  var tags = document.getElementById('nv-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  var payload = {empresa_id:EMPRESA_ID,titulo,area,modalidade:document.getElementById('nv-modalidade').value,tipo_contrato:document.getElementById('nv-contrato').value,salario_max:Number(document.getElementById('nv-salario').value)||null,descricao:document.getElementById('nv-descricao').value,tags,status:'ativa'};
+  if (demoMode) { DEMO.vagas.unshift({...payload,id:Date.now().toString(),created_at:new Date().toISOString()}); closeModal('m-nova-vaga'); loadVagas(); toast('Vaga criada (modo demo)','success'); return; }
+  try {
+    var { error } = await sb.from('vagas').insert(payload);
+    if (error) throw error;
+    closeModal('m-nova-vaga');
+    toast('Vaga criada no banco!','success');
+    loadVagas();
+    loadDashboard();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+async function deleteVaga(id) {
+  if (!confirm('Excluir esta vaga?')) return;
+  if (demoMode) { DEMO.vagas = DEMO.vagas.filter(v=>v.id!==id); loadVagas(); return; }
+  try {
+    var { error } = await sb.from('vagas').delete().eq('id',id);
+    if (error) throw error;
+    toast('Vaga excluída','success');
+    loadVagas();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+// ============================================================
+// CANDIDATOS / PIPELINE
+// ============================================================
+var candsCache = [];
+
+async function loadCandidatos() {
+  document.getElementById('cands-tbody-wrap').innerHTML = '<div class="loading"><i class="ti ti-loader-2"></i> Carregando candidatos...</div>';
+  if (demoMode) { candsCache = DEMO.candidaturas; renderCandidatos(candsCache); return; }
+  try {
+    var { data, error, count } = await sb.from('v_pipeline').select('*',{count:'exact'}).order('score_ia',{ascending:false});
+    if (error) throw error;
+    candsCache = data || [];
+    document.getElementById('cands-sub').textContent = `${count||0} candidatos`;
+    renderCandidatos(candsCache);
+  } catch(e) { document.getElementById('cands-tbody-wrap').innerHTML = `<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+function renderCandidatos(list) {
+  if (!list.length) { document.getElementById('cands-tbody-wrap').innerHTML = '<div class="empty-state"><i class="ti ti-users"></i><div>Nenhum candidato</div></div>'; return; }
+  document.getElementById('cands-tbody-wrap').innerHTML = `<table class="tbl"><thead><tr><th>Candidato</th><th>Vaga</th><th>Score IA</th><th>Etapa</th><th>Cadastrado</th><th>Ações</th></tr></thead><tbody>`+
+    list.map(c=>{
+      var temVaga = c.candidatura_id && c.candidatura_id !== '';
+      var etapaHtml = temVaga
+        ? `<span class="tag ${etapaTag(c.etapa)}">${etapaLabel(c.etapa)}</span>`
+        : `<span class="tag" style="background:#f1efe8;color:#5f5e5a;border:1px solid #d3d1c7"><i class="ti ti-database" style="font-size:11px"></i> Banco de talentos</span>`;
+      var acoes = temVaga
+        ? `<button class="btn btn-ghost btn-sm" title="Avançar etapa" onclick="avancarEtapa('${c.candidatura_id}','${c.etapa}')"><i class="ti ti-arrow-right" style="font-size:13px"></i></button>`
+        : `<button class="btn btn-primary btn-sm" title="Vincular à vaga" onclick="abrirVincular('${c.candidato_id}','${c.candidato_nome}')"><i class="ti ti-link" style="font-size:13px"></i> Vincular</button>`;
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:8px"><div class="av">${initials(c.candidato_nome)}</div><div><div style="font-weight:500">${c.candidato_nome}</div><div style="font-size:11px;color:var(--muted)">${c.candidato_email}</div></div></div></td>
+        <td style="font-size:12px;color:var(--muted)">${c.vaga_titulo||'—'}</td>
+        <td>${temVaga ? `<span style="font-size:13px;font-weight:600;color:${(c.score_ia||0)>=85?'var(--success)':'var(--warn)'}">${c.score_ia||'?'}%</span>` : '<span style="font-size:12px;color:var(--hint)">—</span>'}</td>
+        <td>${etapaHtml}</td>
+        <td style="font-size:11px;color:var(--muted)">${formatDate(c.aplicado_em||c.atualizado_em)}</td>
+        <td><div style="display:flex;gap:4px">${acoes}</div></td>
+      </tr>`;
+    }).join('')+'</tbody></table>';
+}
+
+function filterCandidatos() {
+  var q = document.getElementById('cands-search').value.toLowerCase();
+  var et = document.getElementById('cands-etapa-filter').value;
+  renderCandidatos(candsCache.filter(c => (!q||(c.candidato_nome||'').toLowerCase().includes(q)||(c.vaga_titulo||'').toLowerCase().includes(q)) && (!et||c.etapa===et)));
+}
+
+async function avancarEtapa(candidaturaId, etapaAtual) {
+  var ordem = ['inscrito','triagem_ia','entrevista_rh','entrevista_tecnica','finalista','oferta','contratado'];
+  var idx = ordem.indexOf(etapaAtual);
+  if (idx >= ordem.length-1) { toast('Candidato já na última etapa'); return; }
+  var novaEtapa = ordem[idx+1];
+  if (demoMode) { var c = DEMO.candidaturas.find(c=>c.id===candidaturaId); if(c) c.etapa=novaEtapa; loadCandidatos(); toast('Avançado para: '+etapaLabel(novaEtapa),'success'); return; }
+  try {
+    var { error } = await sb.from('candidaturas').update({etapa:novaEtapa}).eq('id',candidaturaId);
+    if (error) throw error;
+    toast('Avançado para: '+etapaLabel(novaEtapa),'success');
+    loadCandidatos();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+function abrirVincular(candidatoId, candidatoNome) {
+  document.getElementById('vincular-candidato-id').value = candidatoId;
+  document.getElementById('vincular-candidato-nome').textContent = candidatoNome;
+  document.getElementById('vincular-candidato-av').textContent = initials(candidatoNome);
+  openModal('m-vincular-vaga');
+  if (!demoMode) {
+    sb.from('vagas').select('id,titulo').eq('status','ativa').then(({data}) => {
+      document.getElementById('vincular-vaga-select').innerHTML = (data||[]).map(v=>`<option value="${v.id}">${v.titulo}</option>`).join('') || '<option>Nenhuma vaga ativa</option>';
+    });
+  } else {
+    document.getElementById('vincular-vaga-select').innerHTML = DEMO.vagas.map(v=>`<option value="${v.id}">${v.titulo}</option>`).join('');
+  }
+}
+
+async function salvarVinculo() {
+  var candidatoId = document.getElementById('vincular-candidato-id').value;
+  var vagaId = document.getElementById('vincular-vaga-select').value;
+  if (!vagaId) { toast('Selecione uma vaga','error'); return; }
+  if (demoMode) {
+    var cand = candsCache.find(c=>c.candidato_id===candidatoId);
+    if (cand) { cand.candidatura_id = Date.now().toString(); cand.etapa = 'inscrito'; cand.vaga_titulo = DEMO.vagas.find(v=>v.id===vagaId)?.titulo||'—'; }
+    closeModal('m-vincular-vaga'); loadCandidatos(); toast('Candidato vinculado à vaga!','success'); return;
+  }
+  try {
+    var { error } = await sb.from('candidaturas').insert({candidato_id:candidatoId, vaga_id:vagaId, etapa:'inscrito'});
+    if (error) throw error;
+    closeModal('m-vincular-vaga');
+    toast('Candidato vinculado à vaga!','success');
+    loadCandidatos();
+    loadCandidaturas_forSelects();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+async function saveCandidato() {
+  var nome = document.getElementById('nc-nome').value.trim();
+  var email = document.getElementById('nc-email').value.trim();
+  if (!nome || !email) { toast('Nome e e-mail são obrigatórios','error'); return; }
+  var skills = document.getElementById('nc-skills').value.split(',').map(s=>s.trim()).filter(Boolean);
+  var payload = {nome,email,telefone:document.getElementById('nc-telefone').value,linkedin:document.getElementById('nc-linkedin').value,localizacao:document.getElementById('nc-local').value,experiencia_anos:Number(document.getElementById('nc-exp').value)||null,habilidades:skills,consentimento_lgpd:document.getElementById('nc-lgpd').checked};
+  if (demoMode) { DEMO.candidaturas.push({id:Date.now().toString(),candidato_nome:nome,candidato_email:email,vaga_titulo:'—',etapa:'inscrito',score_ia:0,aplicado_em:new Date().toISOString()}); closeModal('m-novo-candidato'); loadCandidatos(); toast('Candidato adicionado (demo)','success'); return; }
+  try {
+    var { error } = await sb.from('candidatos').insert(payload);
+    if (error) throw error;
+    closeModal('m-novo-candidato');
+    toast('Candidato salvo no banco!','success');
+    loadCandidatos();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+async function loadPipeline() {
+  var wrap = document.getElementById('pipeline-wrap');
+  wrap.innerHTML = '<div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div>';
+  var source = demoMode ? DEMO.candidaturas : null;
+  if (!demoMode) {
+    try {
+      var { data } = await sb.from('v_pipeline').select('*').order('score_ia',{ascending:false});
+      source = data || [];
+    } catch(e) { wrap.innerHTML = `<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; return; }
+  }
+  var etapas = ['inscrito','triagem_ia','entrevista_rh','entrevista_tecnica','finalista','oferta','contratado'];
+  var labels = {inscrito:'Inscritos',triagem_ia:'Triagem IA',entrevista_rh:'Ent. RH',entrevista_tecnica:'Técnica',finalista:'Finalistas',oferta:'Oferta',contratado:'Contratados'};
+  var comVaga = source.filter(c => c.candidatura_id && c.candidatura_id !== '');
+  var semVaga = source.filter(c => !c.candidatura_id || c.candidatura_id === '');
+
+  wrap.innerHTML = etapas.map(e => {
+    var cards = comVaga.filter(c=>c.etapa===e);
+    return `<div style="flex-shrink:0;width:185px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px 8px">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">${labels[e]}</div>
+        <div style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;background:var(--bg);color:var(--muted)">${cards.length}</div>
+      </div>
+      ${cards.length ? cards.map(c=>`
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:10px 12px;margin-bottom:7px">
+          <div style="font-size:13px;font-weight:500;margin-bottom:2px">${c.candidato_nome}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px">${c.vaga_titulo||'—'}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span class="tag tag-${(c.score_ia||0)>=85?'green':(c.score_ia||0)>=70?'warn':'red'}" style="font-size:10px">${c.score_ia||'?'}%</span>
+            <button class="btn btn-ghost btn-sm" onclick="avancarEtapa('${c.candidatura_id}','${c.etapa}')" style="padding:2px 6px;font-size:10px"><i class="ti ti-arrow-right" style="font-size:11px"></i></button>
+          </div>
+        </div>`).join('') : `<div style="background:var(--bg);border:1px dashed var(--border);border-radius:var(--r-md);padding:16px;text-align:center;font-size:11px;color:var(--hint)">Vazio</div>`}
+    </div>`;
+  }).join('') + (semVaga.length ? `
+    <div style="flex-shrink:0;width:185px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px 8px">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)">Banco de talentos</div>
+        <div style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:20px;background:var(--bg);color:var(--muted)">${semVaga.length}</div>
+      </div>
+      ${semVaga.map(c=>`
+        <div style="background:var(--card);border:1px dashed var(--border-m);border-radius:var(--r-md);padding:10px 12px;margin-bottom:7px">
+          <div style="font-size:13px;font-weight:500;margin-bottom:2px">${c.candidato_nome}</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Sem vaga vinculada</div>
+          <button class="btn btn-primary btn-sm" style="width:100%;font-size:11px;justify-content:center" onclick="abrirVincular('${c.candidato_id}','${c.candidato_nome}')">
+            <i class="ti ti-link" style="font-size:12px"></i> Vincular à vaga
+          </button>
+        </div>`).join('')}
+    </div>` : '');
+}
+
+async function loadCandidaturas_forSelects() {
+  if (demoMode) {
+    var opts = DEMO.candidaturas.map(c=>`<option value="${c.id}">${c.candidato_nome} — ${c.vaga_titulo}</option>`).join('');
+    ['ag-candidatura','of-candidatura'].forEach(id=>{var el=document.getElementById(id);if(el)el.innerHTML=opts;});
+    return;
+  }
+  try {
+    var { data } = await sb.from('v_pipeline').select('candidatura_id,candidato_nome,vaga_titulo').not('candidatura_id','is',null);
+    var opts = (data||[]).map(c=>`<option value="${c.candidatura_id}">${c.candidato_nome} — ${c.vaga_titulo}</option>`).join('');
+    ['ag-candidatura','of-candidatura'].forEach(id=>{var el=document.getElementById(id);if(el)el.innerHTML=opts||'<option>Sem candidaturas</option>';});
+  } catch(e) {}
+}
+
+// ============================================================
+// ENTREVISTAS
+// ============================================================
+async function loadEntrevistas() {
+  var el = document.getElementById('entrev-list');
+  el.innerHTML = '<div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div>';
+  var data = [];
+  if (demoMode) { data = DEMO.entrevistas; }
+  else {
+    try {
+      var r = await sb.from('entrevistas').select(`*, candidaturas(candidatos(nome), vagas(titulo))`).order('data_hora');
+      data = (r.data||[]).map(e=>({...e,candidato_nome:e.candidaturas?.candidatos?.nome||'—',vaga_titulo:e.candidaturas?.vagas?.titulo||'—'}));
+    } catch(ex) { el.innerHTML=`<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${ex.message}</div>`; return; }
+  }
+  document.getElementById('entrev-sub').textContent = `${data.length} entrevistas`;
+  el.innerHTML = !data.length ? '<div class="empty-state"><i class="ti ti-calendar-event"></i><div>Nenhuma entrevista agendada</div></div>' :
+    '<div class="card">'+data.map(e=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex-shrink:0;width:60px;text-align:center">
+          <div style="font-size:11px;color:var(--muted)">${formatDate(e.data_hora)}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)">${e.data_hora?new Date(e.data_hora).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—'}</div>
+        </div>
+        <div class="av">${initials(e.candidato_nome)}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:500">${e.candidato_nome}</div>
+          <div style="font-size:11px;color:var(--muted)">${e.vaga_titulo} · ${e.tipo} · ${e.formato}</div>
+        </div>
+        <span class="tag tag-${e.status==='agendada'?'blue':e.status==='realizada'?'green':'red'}">${e.status}</span>
+        ${e.link_video?`<a href="${e.link_video}" target="_blank" class="btn btn-ghost btn-sm"><i class="ti ti-video"></i></a>`:''}
+      </div>`).join('')+'</div>';
+}
+
+async function saveEntrevista() {
+  var cid = document.getElementById('ag-candidatura').value;
+  var data = document.getElementById('ag-data').value;
+  var hora = document.getElementById('ag-hora').value;
+  if (!cid || !data || !hora) { toast('Preencha todos os campos','error'); return; }
+  var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00`,tipo:document.getElementById('ag-tipo').value,formato:document.getElementById('ag-formato').value,link_video:document.getElementById('ag-link').value||null,status:'agendada'};
+  if (demoMode) { DEMO.entrevistas.push({...payload,id:Date.now().toString(),candidato_nome:'Novo candidato',vaga_titulo:'—'}); closeModal('m-agendar'); loadEntrevistas(); toast('Entrevista agendada (demo)','success'); return; }
+  try {
+    var { error } = await sb.from('entrevistas').insert(payload);
+    if (error) throw error;
+    closeModal('m-agendar');
+    toast('Entrevista agendada!','success');
+    loadEntrevistas();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+// ============================================================
+// OFERTAS
+// ============================================================
+async function loadOfertas() {
+  var el = document.getElementById('ofertas-list');
+  el.innerHTML = '<div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div>';
+  if (demoMode) {
+    el.innerHTML = '<div class="card"><div class="empty-state"><i class="ti ti-award"></i><div>Nenhuma oferta no demo</div></div></div>';
+    return;
+  }
+  try {
+    var { data, count } = await sb.from('ofertas').select(`*, candidaturas(candidatos(nome), vagas(titulo))`,{count:'exact'}).order('created_at',{ascending:false});
+    document.getElementById('ofertas-sub').textContent = `${count||0} ofertas`;
+    el.innerHTML = !(data||[]).length ? '<div class="empty-state"><i class="ti ti-award"></i><div>Nenhuma oferta</div></div>' :
+      (data||[]).map(o=>`
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div><div style="font-size:14px;font-weight:600">${o.candidaturas?.candidatos?.nome||'—'}</div><div style="font-size:12px;color:var(--muted)">${o.candidaturas?.vagas?.titulo||'—'}</div></div>
+            <span class="tag tag-${o.status==='aceita'?'green':o.status==='pendente'?'warn':'red'}">${o.status}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:12px">
+            <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint)">Salário</div><div style="font-weight:500;color:var(--success)">R$ ${Number(o.salario).toLocaleString('pt-BR')}/mês</div></div>
+            <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint)">Bônus</div><div style="font-weight:500">R$ ${Number(o.bonus_signing||0).toLocaleString('pt-BR')}</div></div>
+            <div><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint)">Início</div><div style="font-weight:500">${formatDate(o.data_inicio)}</div></div>
+          </div>
+        </div>`).join('');
+  } catch(e) { el.innerHTML=`<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+async function saveOferta() {
+  var cid = document.getElementById('of-candidatura').value;
+  var sal = document.getElementById('of-salario').value;
+  if (!cid || !sal) { toast('Preencha os campos','error'); return; }
+  if (demoMode) { closeModal('m-nova-oferta'); toast('Oferta criada (demo)','success'); return; }
+  try {
+    var { error } = await sb.from('ofertas').insert({candidatura_id:cid,salario:Number(sal),bonus_signing:Number(document.getElementById('of-bonus').value)||0,data_inicio:document.getElementById('of-inicio').value||null,validade:document.getElementById('of-validade').value||null,status:'pendente'});
+    if (error) throw error;
+    closeModal('m-nova-oferta');
+    toast('Oferta salva no banco!','success');
+    loadOfertas();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+// ============================================================
+// RELATÓRIOS
+// ============================================================
+async function loadRelatorios() {
+  if (demoMode) {
+    document.getElementById('relat-stats').innerHTML = `
+      <div class="stat"><div class="stat-label">Total vagas</div><div class="stat-value">${DEMO.vagas.length}</div></div>
+      <div class="stat"><div class="stat-label">Candidaturas</div><div class="stat-value">${DEMO.candidaturas.length}</div></div>
+      <div class="stat"><div class="stat-label">Score médio IA</div><div class="stat-value">${Math.round(DEMO.candidaturas.reduce((a,c)=>a+c.score_ia,0)/DEMO.candidaturas.length)}%</div></div>
+      <div class="stat"><div class="stat-label">Entrevistas</div><div class="stat-value">${DEMO.entrevistas.length}</div></div>`;
+    renderEtapasChart(DEMO.candidaturas);
+    return;
+  }
+  try {
+    var [vagasR, candsR, entrevR, ofertasR] = await Promise.all([
+      sb.from('vagas').select('*',{count:'exact'}).eq('empresa_id',EMPRESA_ID),
+      sb.from('v_pipeline').select('etapa,score_ia'),
+      sb.from('entrevistas').select('*',{count:'exact'}),
+      sb.from('ofertas').select('*',{count:'exact'})
+    ]);
+    var scores = (candsR.data||[]).filter(c=>c.score_ia).map(c=>c.score_ia);
+    var scoreMedio = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+    document.getElementById('relat-stats').innerHTML = `
+      <div class="stat"><div class="stat-label">Total vagas</div><div class="stat-value">${vagasR.count||0}</div></div>
+      <div class="stat"><div class="stat-label">Candidaturas</div><div class="stat-value">${candsR.count||0}</div></div>
+      <div class="stat"><div class="stat-label">Score médio IA</div><div class="stat-value">${scoreMedio}%</div></div>
+      <div class="stat"><div class="stat-label">Entrevistas</div><div class="stat-value">${entrevR.count||0}</div></div>`;
+    renderEtapasChart(candsR.data||[]);
+
+    var areas = {};
+    (vagasR.data||[]).forEach(v=>{ areas[v.area]=(areas[v.area]||0)+1; });
+    var total = Object.values(areas).reduce((a,b)=>a+b,0);
+    document.getElementById('relat-areas').innerHTML = Object.entries(areas).sort((a,b)=>b[1]-a[1]).map(([a,n])=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="flex:1;font-size:13px;font-weight:500">${a}</span>
+        <span style="font-size:12px;color:var(--muted)">${n} vagas</span>
+        <div style="width:80px"><div class="prog-bg"><div class="prog-fill" style="width:${Math.round(n/total*100)}%;background:var(--accent)"></div></div></div>
+        <span style="font-size:11px;font-weight:500;width:32px;text-align:right">${Math.round(n/total*100)}%</span>
+      </div>`).join('') || '<div class="empty-state">Sem dados</div>';
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+function renderEtapasChart(data) {
+  var etapas = {inscrito:0,triagem_ia:0,entrevista_rh:0,entrevista_tecnica:0,finalista:0,oferta:0,contratado:0};
+  data.forEach(c=>{ if(etapas[c.etapa]!==undefined) etapas[c.etapa]++; });
+  var total = Object.values(etapas).reduce((a,b)=>a+b,1);
+  var labels = {inscrito:'Inscritos',triagem_ia:'Triagem IA',entrevista_rh:'Ent. RH',entrevista_tecnica:'Técnica',finalista:'Finalistas',oferta:'Oferta',contratado:'Contratados'};
+  var colors = {inscrito:'#b5d4f4',triagem_ia:'#1a56a0',entrevista_rh:'#4e3fb5',entrevista_tecnica:'#0a6655',finalista:'#c0dd97',oferta:'#639922',contratado:'#2d6a0f'};
+  document.getElementById('relat-etapas').innerHTML = Object.entries(etapas).map(([e,n])=>`
+    <div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>${labels[e]}</span><span style="font-weight:500">${n}</span></div>
+      <div class="prog-bg"><div class="prog-fill" style="width:${Math.round(n/total*100)}%;background:${colors[e]}"></div></div>
+    </div>`).join('');
+}
+
+// ============================================================
+// MENSAGENS
+// ============================================================
+async function loadMensagens() {
+  var el = document.getElementById('msgs-list');
+  if (demoMode) {
+    el.innerHTML = ['Lucas Ferreira','Ana Carolina','Rafael Mendes'].map((n,i)=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);cursor:pointer;background:${i===0?'var(--accent-l)':''}">
+        <div class="av">${initials(n)}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${n}</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mensagem de exemplo...</div></div>
+        <div style="text-align:right"><div style="font-size:10px;color:var(--hint)">${i===0?'10min':'Ontem'}</div>${i===0?'<div style="font-size:9px;background:var(--accent);color:#fff;border-radius:20px;padding:1px 6px;margin-top:2px">2</div>':''}</div>
+      </div>`).join('');
+    return;
+  }
+  try {
+    var { data } = await sb.from('mensagens').select(`*, candidaturas(candidatos(nome,email))`).order('created_at',{ascending:false}).limit(20);
+    var convs = {};
+    (data||[]).forEach(m => {
+      var nome = m.candidaturas?.candidatos?.nome || 'Desconhecido';
+      var cid = m.candidatura_id;
+      if (!convs[cid]) convs[cid] = {nome, msgs:[], lidas:0};
+      convs[cid].msgs.push(m);
+      if (!m.lida) convs[cid].lidas++;
+    });
+    el.innerHTML = !Object.keys(convs).length ? '<div class="empty-state"><i class="ti ti-message-dots"></i>Nenhuma mensagem</div>' :
+      Object.entries(convs).map(([cid,c])=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);cursor:pointer${c.lidas?';background:var(--accent-l)':''}" onclick="openChat('${cid}','${c.nome}')">
+        <div class="av">${initials(c.nome)}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${c.nome}</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.msgs[0]?.conteudo||''}</div></div>
+        ${c.lidas?`<div style="font-size:9px;background:var(--accent);color:#fff;border-radius:20px;padding:1px 6px">${c.lidas}</div>`:''}
+      </div>`).join('');
+  } catch(e) { el.innerHTML=`<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+async function openChat(candidaturaId, nome) {
+  var panel = document.getElementById('msg-chat-panel');
+  panel.innerHTML = `<div class="card-hd"><div class="card-title">${nome}</div></div><div id="chat-content" style="min-height:180px"><div class="loading"><i class="ti ti-loader-2"></i></div></div><div style="display:flex;gap:8px;margin-top:12px"><input style="flex:1;border:1px solid var(--border);border-radius:var(--r-md);padding:7px 10px;font-size:12px;background:var(--bg)" id="chat-reply" placeholder="Responder..."><button class="btn btn-primary btn-sm" onclick="sendMsg('${candidaturaId}')"><i class="ti ti-send" style="font-size:13px"></i></button></div>`;
+  try {
+    var { data } = await sb.from('mensagens').select('*').eq('candidatura_id',candidaturaId).order('created_at');
+    document.getElementById('chat-content').innerHTML = (data||[]).map(m=>`
+      <div style="display:flex;justify-content:${m.remetente_tipo==='rh'?'flex-end':'flex-start'};margin-bottom:8px">
+        <div style="max-width:80%;background:${m.remetente_tipo==='rh'?'var(--accent)':'var(--bg)'};color:${m.remetente_tipo==='rh'?'#fff':'var(--text)'};border-radius:10px;padding:8px 12px;font-size:12px;line-height:1.5">${m.conteudo}</div>
+      </div>`).join('') || '<div class="empty-state" style="padding:1rem"><i class="ti ti-message"></i><div>Sem mensagens</div></div>';
+  } catch(e) {}
+}
+
+async function sendMsg(candidaturaId) {
+  var inp = document.getElementById('chat-reply');
+  var msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  try {
+    var { error } = await sb.from('mensagens').insert({candidatura_id:candidaturaId,remetente_tipo:'rh',remetente_id:(await sb.auth.getUser()).data.user?.id||'demo',conteudo:msg});
+    if (error) throw error;
+    openChat(candidaturaId, '');
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+// ============================================================
+// EMAIL TEMPLATES
+// ============================================================
+async function loadEmailTemplates() {
+  var el = document.getElementById('email-templates-list');
+  if (demoMode) {
+    renderEmailTemplates(DEMO.templates);
+    return;
+  }
+  try {
+    var { data } = await sb.from('email_templates').select('*').eq('empresa_id',EMPRESA_ID).order('created_at');
+    renderEmailTemplates(data||[]);
+  } catch(e) { el.innerHTML=`<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+function renderEmailTemplates(list) {
+  document.getElementById('email-templates-list').innerHTML = !list.length ?
+    '<div class="empty-state"><i class="ti ti-mail"></i>Nenhum template</div>' :
+    list.map(t=>`
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:8px;cursor:pointer" onclick="loadTemplateEditor('${t.id}')">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);margin-bottom:4px">${t.gatilho.replace(/_/g,' ')}</div>
+        <div style="font-size:13px;font-weight:500;margin-bottom:3px">${t.assunto}</div>
+        <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.corpo}</div>
+      </div>`).join('');
+}
+
+function loadTemplateEditor(id) {
+  toast('Clique em "Gerar IA" para criar um novo ou edite os campos à direita');
+}
+
+async function saveEmailTemplate() {
+  var payload = {empresa_id:EMPRESA_ID,gatilho:document.getElementById('et-gatilho').value,assunto:document.getElementById('et-assunto').value,corpo:document.getElementById('et-corpo').value};
+  if (!payload.assunto || !payload.corpo) { toast('Preencha assunto e corpo','error'); return; }
+  if (demoMode) { DEMO.templates.push({...payload,id:Date.now().toString()}); loadEmailTemplates(); toast('Template salvo (demo)','success'); return; }
+  try {
+    var { error } = await sb.from('email_templates').insert(payload);
+    if (error) throw error;
+    toast('Template salvo no banco!','success');
+    loadEmailTemplates();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+async function saveEmailTemplateModal() {
+  var payload = {empresa_id:EMPRESA_ID,gatilho:document.getElementById('net-gatilho').value,assunto:document.getElementById('net-assunto').value,corpo:document.getElementById('net-corpo').value};
+  if (!payload.assunto) { toast('Preencha o assunto','error'); return; }
+  if (demoMode) { DEMO.templates.push({...payload,id:Date.now().toString()}); closeModal('m-email-template'); loadEmailTemplates(); toast('Template salvo (demo)','success'); return; }
+  try {
+    var { error } = await sb.from('email_templates').insert(payload);
+    if (error) throw error;
+    closeModal('m-email-template');
+    toast('Template salvo!','success');
+    loadEmailTemplates();
+  } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+async function genEmailAI() {
+  var p = document.getElementById('et-ai-preview');
+  p.style.display = 'block';
+  p.textContent = 'Gerando com IA...';
+  try {
+    var r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,system:'Escreva e-mails profissionais de RH. Use variáveis {nome},{cargo},{empresa}. Tom humano e acolhedor. Em português.',messages:[{role:'user',content:`E-mail de ${document.getElementById('et-gatilho').value.replace(/_/g,' ')} para candidato a uma vaga.`}]})});
+    var d = await r.json();
+    p.textContent = d.content[0].text;
+    document.getElementById('et-corpo').value = d.content[0].text;
+  } catch(e) { p.textContent = 'Erro.'; }
+}
+
+// ============================================================
+// LGPD
+// ============================================================
+async function loadLGPD() {
+  var el = document.getElementById('lgpd-stats');
+  if (demoMode) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">No modo demo todos os candidatos têm consentimento marcado.</div>'; return; }
+  try {
+    var { data } = await sb.from('candidatos').select('nome,consentimento_lgpd,consentimento_contato').order('created_at',{ascending:false}).limit(20);
+    var total = (data||[]).length;
+    var comConsentimento = (data||[]).filter(c=>c.consentimento_lgpd).length;
+    el.innerHTML = `<div style="font-size:24px;font-weight:600;margin-bottom:4px">${comConsentimento}/${total}</div><div style="font-size:12px;color:var(--muted);margin-bottom:12px">candidatos com consentimento LGPD</div>
+      <div class="prog-bg" style="margin-bottom:12px"><div class="prog-fill" style="width:${total?Math.round(comConsentimento/total*100):0}%;background:var(--success)"></div></div>`+
+      (data||[]).slice(0,8).map(c=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="font-weight:500">${c.nome}</span><span class="tag tag-${c.consentimento_lgpd?'green':'red'}">${c.consentimento_lgpd?'Consentido':'Pendente'}</span></div>`).join('');
+  } catch(e) { el.innerHTML=`<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+// ============================================================
+// CONFIG
+// ============================================================
+async function loadConfig() {
+  var url = localStorage.getItem('sb_url') || '';
+  var key = localStorage.getItem('sb_key') || '';
+  document.getElementById('cfg-url').value = url;
+  document.getElementById('cfg-key').value = key;
+  var el = document.getElementById('db-status-detail');
+  if (demoMode) { el.innerHTML = '<div style="font-size:13px;color:var(--muted)">Modo demo ativo. Dados não são persistidos.</div>'; return; }
+  try {
+    var checks = await Promise.all(['vagas','candidatos','candidaturas','entrevistas','ofertas','email_templates'].map(async t => {
+      var { count, error } = await sb.from(t).select('*',{count:'exact',head:true});
+      return { tabela: t, count: error ? '✗' : count, ok: !error };
+    }));
+    el.innerHTML = '<div style="display:flex;flex-direction:column;gap:6px">'+checks.map(c=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:${c.ok?'var(--success-l)':'var(--danger-l)'};border-radius:var(--r-sm)">
+        <span style="font-size:12px;font-weight:500;color:${c.ok?'var(--success)':'var(--danger)'}">${c.tabela}</span>
+        <span style="font-size:12px;color:${c.ok?'var(--success)':'var(--danger)'}">${c.ok?c.count+' registros':'Erro'}</span>
+      </div>`).join('')+'</div>';
+  } catch(e) { el.innerHTML=`<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+async function testConnection() {
+  showStatus('config-status','testing','Testando...');
+  try {
+    var { error } = await sb.from('vagas').select('id').limit(1);
+    if (error) throw error;
+    showStatus('config-status','ok','Conexão OK');
+  } catch(e) { showStatus('config-status','err','Falhou: '+e.message); }
+}
+
+// ============================================================
+// IA COM CONTEXTO DO BANCO
+// ============================================================
+var iaContext = '';
+
+async function loadIAContext() {
+  var el = document.getElementById('ia-context');
+  if (!el) return;
+  var ctx = '';
+  if (demoMode) {
+    ctx = `Vagas ativas: ${DEMO.vagas.length}\nCandidaturas: ${DEMO.candidaturas.length}\nScore médio: ${Math.round(DEMO.candidaturas.reduce((a,c)=>a+c.score_ia,0)/DEMO.candidaturas.length)}%\nEntrevistas: ${DEMO.entrevistas.length}`;
+  } else {
+    try {
+      var [v,c] = await Promise.all([
+        sb.from('vagas').select('titulo,area,modalidade',{count:'exact'}).eq('empresa_id',EMPRESA_ID).eq('status','ativa'),
+        sb.from('v_pipeline').select('candidato_nome,vaga_titulo,etapa,score_ia').order('score_ia',{ascending:false}).limit(10)
+      ]);
+      var topCands = (c.data||[]).slice(0,5).map(x=>`${x.candidato_nome}(${x.score_ia||'?'}% - ${etapaLabel(x.etapa)})`).join(', ');
+      ctx = `Vagas ativas: ${v.count||0} (${(v.data||[]).map(x=>x.titulo).join(', ')})\nTotal candidaturas: ${c.count||0}\nTop candidatos: ${topCands}`;
+    } catch(e) { ctx = 'Erro ao carregar contexto'; }
+  }
+  iaContext = ctx;
+  el.innerHTML = ctx.split('\n').map(l=>`<div style="padding:3px 0;border-bottom:1px solid var(--border)">${l}</div>`).join('');
+}
+
+async function sendAI() {
+  var inp = document.getElementById('ai-input'), msg = inp.value.trim();
+  if (!msg) return;
+  inp.value = '';
+  var msgs = document.getElementById('chat-msgs');
+  msgs.innerHTML += `<div style="align-self:flex-end;max-width:85%"><div style="background:var(--accent);color:#fff;border-radius:10px 10px 4px 10px;padding:8px 12px;font-size:12px;line-height:1.6">${msg}</div></div>`;
+  msgs.innerHTML += `<div style="align-self:flex-start;max-width:85%" id="ai-typing"><div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;color:var(--muted)">Analisando...</div></div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+  try {
+    var system = `Você é um assistente de RH especializado. Responda em português brasileiro, seja objetivo e use emojis para organizar visualmente. Contexto atual do banco de dados:\n${iaContext}`;
+    var r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system,messages:[{role:'user',content:msg}]})});
+    var d = await r.json();
+    document.getElementById('ai-typing').innerHTML = `<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;line-height:1.6">${(d.content[0].text||'').replace(/\n/g,'<br>')}</div>`;
+  } catch(e) { document.getElementById('ai-typing').innerHTML = '<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px">Erro de conexão.</div>'; }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function askAIWithContext(p) {
+  openView('v-ia');
+  setTimeout(()=>{ document.getElementById('ai-input').value=p; sendAI(); },100);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.onload = function() {
+  var url = localStorage.getItem('sb_url');
+  var key = localStorage.getItem('sb_key');
+  if (url && key) {
+    document.getElementById('sb-url').value = url;
+    document.getElementById('sb-key').value = key;
+    initSupabase(url, key);
+    enterApp();
+  }
+};
+</script>
+</body>
+</html>
