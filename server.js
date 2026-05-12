@@ -79,12 +79,14 @@ const server = http.createServer((req, res) => {
     var body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
+      console.log('AI request received, key starts with:', ANTHROPIC_KEY.substring(0, 15) + '...');
       var options = {
         hostname: 'api.anthropic.com',
         path: '/v1/messages',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
           'x-api-key': ANTHROPIC_KEY,
           'anthropic-version': '2023-06-01',
         }
@@ -94,6 +96,10 @@ const server = http.createServer((req, res) => {
         var data = '';
         proxyRes.on('data', chunk => data += chunk);
         proxyRes.on('end', () => {
+          console.log('Anthropic status:', proxyRes.statusCode);
+          if (proxyRes.statusCode !== 200) {
+            console.log('Anthropic error body:', data);
+          }
           res.writeHead(proxyRes.statusCode, {'Content-Type': 'application/json'});
           res.end(data);
         });
