@@ -318,6 +318,7 @@ button{cursor:pointer;}
         <div><div class="page-title">Candidatos</div><div class="page-sub" id="cands-sub"></div></div>
         <div class="page-actions">
           <button class="btn btn-ghost btn-sm" onclick="loadCandidatos()"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="calcularTodosScores()"><i class="ti ti-sparkles"></i> Calcular scores</button>
           <button class="btn btn-primary btn-sm" onclick="openModal('m-novo-candidato')"><i class="ti ti-user-plus"></i> Adicionar</button>
         </div>
       </div>
@@ -503,6 +504,20 @@ button{cursor:pointer;}
 </div>
 
 <!-- MODALS -->
+<!-- MODAL: DETALHE DO CANDIDATO -->
+<div class="modal-overlay" id="m-candidato">
+  <div class="modal-box" style="max-width:620px">
+    <div class="modal-hd">
+      <div class="modal-title">Perfil do candidato</div>
+      <button class="modal-close" onclick="closeModal('m-candidato')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body" id="m-candidato-body">
+      <div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div>
+    </div>
+    <div class="modal-foot" id="m-candidato-foot"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="m-nova-vaga">
   <div class="modal-box">
     <div class="modal-hd"><div class="modal-title">Nova vaga</div><button class="modal-close" onclick="closeModal('m-nova-vaga')"><i class="ti ti-x"></i></button></div>
@@ -994,7 +1009,10 @@ function renderCandidatos(list) {
         <td>${temVaga ? `<span style="font-size:13px;font-weight:600;color:${(c.score_ia||0)>=85?'var(--success)':'var(--warn)'}">${c.score_ia||'?'}%</span>` : '<span style="font-size:12px;color:var(--hint)">—</span>'}</td>
         <td>${etapaHtml}</td>
         <td style="font-size:11px;color:var(--muted)">${formatDate(c.aplicado_em||c.atualizado_em)}</td>
-        <td><div style="display:flex;gap:4px">${acoes}</div></td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" title="Ver perfil" onclick="openCandidatoDetail('${c.candidato_id}','${c.candidatura_id||''}')"><i class="ti ti-eye" style="font-size:13px"></i></button>
+        ${temVaga ? `<button class="btn btn-ghost btn-sm" title="Avançar etapa" onclick="avancarEtapa('${c.candidatura_id}','${c.etapa}')"><i class="ti ti-arrow-right" style="font-size:13px"></i></button>` : `<button class="btn btn-primary btn-sm" title="Vincular à vaga" onclick="abrirVincular('${c.candidato_id}','${c.candidato_nome}')"><i class="ti ti-link" style="font-size:13px"></i> Vincular</button>`}
+      </div></td>
       </tr>`;
     }).join('')+'</tbody></table>';
 }
@@ -1005,7 +1023,202 @@ function filterCandidatos() {
   renderCandidatos(candsCache.filter(c => (!q||(c.candidato_nome||'').toLowerCase().includes(q)||(c.vaga_titulo||'').toLowerCase().includes(q)) && (!et||c.etapa===et)));
 }
 
-async function avancarEtapa(candidaturaId, etapaAtual) {
+async function openCandidatoDetail(candidatoId, candidaturaId) {
+  openModal('m-candidato');
+  var body = document.getElementById('m-candidato-body');
+  var foot = document.getElementById('m-candidato-foot');
+  body.innerHTML = '<div class="loading"><i class="ti ti-loader-2"></i> Carregando perfil...</div>';
+  foot.innerHTML = '';
+  try {
+    // Busca candidato e candidatura
+    var [candRes, candaturaRes] = await Promise.all([
+      sb.from('candidatos').select('*').eq('id', candidatoId).single(),
+      candidaturaId ? sb.from('candidaturas').select('*, vagas(titulo,area,requisitos,tags,descricao)').eq('id', candidaturaId).single() : Promise.resolve({data:null})
+    ]);
+    var c = candRes.data;
+    var cand = candaturaRes.data;
+    var vaga = cand?.vagas || null;
+    if (!c) { body.innerHTML = '<div class="empty-state">Candidato não encontrado</div>'; return; }
+
+    body.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border)">
+        <div class="av" style="width:52px;height:52px;font-size:18px;font-weight:700;border-radius:50%">${initials(c.nome)}</div>
+        <div style="flex:1">
+          <div style="font-size:18px;font-weight:600">${c.nome}</div>
+          <div style="font-size:13px;color:var(--muted)">${c.email} ${c.telefone?'· '+c.telefone:''}</div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            ${c.localizacao?`<span class="tag tag-gray"><i class="ti ti-map-pin" style="font-size:11px"></i> ${c.localizacao}</span>`:''}
+            ${c.experiencia_anos?`<span class="tag tag-blue">${c.experiencia_anos} anos exp.</span>`:''}
+            ${c.disponibilidade?`<span class="tag tag-green">Disponível: ${c.disponibilidade}</span>`:''}
+            ${c.linkedin?`<a href="https://${c.linkedin}" target="_blank" class="tag tag-purple" style="text-decoration:none"><i class="ti ti-brand-linkedin" style="font-size:11px"></i> LinkedIn</a>`:''}
+          </div>
+        </div>
+        <div style="text-align:center;flex-shrink:0" id="score-section">
+          ${cand ? `
+          <div style="font-size:28px;font-weight:700;color:${(cand.score_ia||0)>=85?'var(--success)':(cand.score_ia||0)>=70?'var(--warn)':'var(--hint)'}" id="score-display">
+            ${cand.score_ia ? cand.score_ia+'%' : '—'}
+          </div>
+          <div style="font-size:10px;color:var(--muted)">Score IA</div>
+          ${!cand.score_ia ? `<button class="btn btn-ghost btn-sm" style="margin-top:6px;font-size:11px" onclick="calcularScore('${candidaturaId}','${candidatoId}')">
+            <i class="ti ti-sparkles"></i> Calcular
+          </button>` : ''}` : '<div style="font-size:12px;color:var(--muted)">Banco de talentos</div>'}
+        </div>
+      </div>
+
+      ${(c.habilidades||[]).length ? `
+      <div style="margin-bottom:1rem">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:7px">Habilidades</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${c.habilidades.map(h=>`<span class="tag tag-gray">${h}</span>`).join('')}
+        </div>
+      </div>` : ''}
+
+      ${vaga ? `
+      <div style="margin-bottom:1rem;padding:12px;background:var(--bg);border-radius:var(--r-md)">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:6px">Candidato para</div>
+        <div style="font-size:14px;font-weight:500">${vaga.titulo}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px">${vaga.area||'—'}</div>
+      </div>` : ''}
+
+      ${cand?.analise_ia ? `
+      <div style="margin-bottom:1rem">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:7px">Análise da IA</div>
+        <div style="background:var(--accent-l);border-radius:var(--r-md);padding:12px;font-size:12px;line-height:1.7;color:var(--accent-d)" id="analise-ia-text">
+          ${cand.analise_ia.replace(/\n/g,'<br>')}
+        </div>
+      </div>` : `
+      ${candidaturaId ? `
+      <div style="margin-bottom:1rem" id="analise-section">
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:7px">Análise da IA</div>
+        <div style="background:var(--bg);border-radius:var(--r-md);padding:12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px">
+          <i class="ti ti-sparkles" style="font-size:15px;color:var(--hint)"></i>
+          Clique em "Calcular Score" para a IA analisar este candidato
+        </div>
+      </div>` : ''}`}
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px">
+        <div style="padding:10px;background:var(--bg);border-radius:var(--r-sm)">
+          <div style="color:var(--muted);margin-bottom:3px">E-mail</div>
+          <div style="font-weight:500">${c.email}</div>
+        </div>
+        ${c.telefone?`<div style="padding:10px;background:var(--bg);border-radius:var(--r-sm)"><div style="color:var(--muted);margin-bottom:3px">Telefone</div><div style="font-weight:500">${c.telefone}</div></div>`:''}
+        <div style="padding:10px;background:var(--bg);border-radius:var(--r-sm)">
+          <div style="color:var(--muted);margin-bottom:3px">LGPD</div>
+          <div style="font-weight:500;color:${c.consentimento_lgpd?'var(--success)':'var(--danger)'}">
+            ${c.consentimento_lgpd?'✓ Consentido':'✗ Pendente'}
+          </div>
+        </div>
+        <div style="padding:10px;background:var(--bg);border-radius:var(--r-sm)">
+          <div style="color:var(--muted);margin-bottom:3px">Cadastrado</div>
+          <div style="font-weight:500">${formatDate(c.created_at)}</div>
+        </div>
+      </div>`;
+
+    foot.innerHTML = `
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato')">Fechar</button>
+      ${candidaturaId ? `
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-msgs')"><i class="ti ti-message"></i> Mensagem</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-agenda')"><i class="ti ti-calendar"></i> Agendar</button>
+        <button class="btn btn-primary btn-sm" onclick="avancarEtapa('${candidaturaId}','${cand?.etapa||'inscrito'}');closeModal('m-candidato')">
+          <i class="ti ti-arrow-right"></i> Avançar etapa
+        </button>` : `
+        <button class="btn btn-primary btn-sm" onclick="closeModal('m-candidato');abrirVincular('${candidatoId}','${c.nome}')">
+          <i class="ti ti-link"></i> Vincular à vaga
+        </button>`}`;
+
+  } catch(e) { body.innerHTML = `<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+}
+
+async function calcularScore(candidaturaId, candidatoId) {
+  var btn = document.querySelector('button[onclick*="calcularScore"]');
+  if (btn) { btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Calculando...'; btn.disabled = true; }
+
+  try {
+    var [candRes, candidaturaRes] = await Promise.all([
+      sb.from('candidatos').select('*').eq('id', candidatoId).single(),
+      sb.from('candidaturas').select('*, vagas(*)').eq('id', candidaturaId).single()
+    ]);
+    var c = candRes.data;
+    var cand = candidaturaRes.data;
+    var vaga = cand?.vagas;
+    if (!c || !vaga) { toast('Dados insuficientes para calcular', 'error'); return; }
+
+    var prompt = `Analise a compatibilidade entre este candidato e esta vaga de emprego.
+
+CANDIDATO:
+- Nome: ${c.nome}
+- Experiência: ${c.experiencia_anos || 'não informado'} anos
+- Habilidades: ${(c.habilidades||[]).join(', ') || 'não informado'}
+- Localização: ${c.localizacao || 'não informado'}
+
+VAGA:
+- Título: ${vaga.titulo}
+- Área: ${vaga.area}
+- Modalidade: ${vaga.modalidade}
+- Requisitos: ${(vaga.requisitos||[]).join(', ') || 'não informado'}
+- Tags/Skills: ${(vaga.tags||[]).join(', ') || 'não informado'}
+- Descrição: ${vaga.descricao || 'não informado'}
+
+Responda EXATAMENTE neste formato JSON (sem mais nada):
+{"score": 85, "analise": "Texto da análise aqui explicando pontos fortes e fracos"}
+
+O score deve ser um número de 0 a 100. A análise deve ter 3-4 linhas explicando o fit técnico, pontos fortes e o que falta.`;
+
+    var r = await fetch('/api/ai', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 400,
+        system: 'Você é um especialista em RH. Responda APENAS com JSON válido, sem markdown, sem explicações extras.',
+        messages: [{role:'user', content: prompt}]
+      })
+    });
+    var d = await r.json();
+    var text = d.content[0].text.trim();
+    // Remove possíveis markdown code blocks
+    text = text.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+    var result = JSON.parse(text);
+    var score = Math.min(100, Math.max(0, Math.round(result.score)));
+    var analise = result.analise || '';
+
+    // Salva no banco
+    await sb.from('candidaturas').update({score_ia: score, analise_ia: analise}).eq('id', candidaturaId);
+
+    // Atualiza UI
+    document.getElementById('score-display').textContent = score + '%';
+    document.getElementById('score-display').style.color = score>=85?'var(--success)':score>=70?'var(--warn)':'var(--hint)';
+    if (btn) btn.remove();
+
+    var analiseSection = document.getElementById('analise-section');
+    if (analiseSection) {
+      analiseSection.innerHTML = `
+        <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--hint);margin-bottom:7px">Análise da IA</div>
+        <div style="background:var(--accent-l);border-radius:var(--r-md);padding:12px;font-size:12px;line-height:1.7;color:var(--accent-d)">
+          ${analise.replace(/\n/g,'<br>')}
+        </div>`;
+    }
+    toast('Score calculado: '+score+'%', 'success');
+    // Recarrega lista de candidatos
+    loadCandidatos();
+  } catch(e) {
+    toast('Erro ao calcular: '+e.message, 'error');
+    if (btn) { btn.innerHTML = '<i class="ti ti-sparkles"></i> Recalcular'; btn.disabled = false; }
+  }
+}
+
+async function calcularTodosScores() {
+  toast('Calculando scores para todos os candidatos sem score...');
+  try {
+    var { data } = await sb.from('candidaturas').select('id, candidato_id').is('score_ia', null).limit(10);
+    if (!data || !data.length) { toast('Todos os candidatos já têm score!'); return; }
+    for (var cand of data) {
+      await calcularScore(cand.id, cand.candidato_id);
+      await new Promise(r => setTimeout(r, 500)); // evitar rate limit
+    }
+    toast('Scores calculados!', 'success');
+  } catch(e) { toast('Erro: '+e.message, 'error'); }
+}
   var ordem = ['inscrito','triagem_ia','entrevista_rh','entrevista_tecnica','finalista','oferta','contratado'];
   var idx = ordem.indexOf(etapaAtual);
   if (idx >= ordem.length-1) { toast('Candidato já na última etapa'); return; }

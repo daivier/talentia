@@ -847,8 +847,15 @@ function prevStep() { if(applyStep>0){applyStep--;renderApplyStep();} }
 async function submitApply() {
   var lgpd = document.getElementById('ap-lgpd');
   if (lgpd && !lgpd.checked) { toast('Aceite os termos para continuar','error'); return; }
+
+  // Mostra loading
+  var nextBtn = document.getElementById('apply-next');
+  nextBtn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Enviando...';
+  nextBtn.disabled = true;
+
   try {
-    var { error } = await sb.from('candidaturas').insert({
+    // 1. Salva a candidatura no banco
+    var { data: candidatura, error } = await sb.from('candidaturas').insert({
       candidato_id: currentCandidato.id,
       vaga_id: applyJob.id,
       etapa: 'inscrito',
@@ -856,19 +863,29 @@ async function submitApply() {
         document.getElementById('ap-q1')?.value,
         document.getElementById('ap-q2')?.value
       ].filter(Boolean).join('\n\n')
-    });
+    }).select().single();
     if (error) throw error;
+
     appliedIds.push(applyJob.id);
-    // Sucesso
+
+    // 2. Calcula score IA em background (não bloqueia o fluxo)
+    calcularScorePortal(candidatura.id, currentCandidato, applyJob).catch(e => {
+      console.warn('Score IA não calculado:', e.message);
+    });
+
+    // 3. Mostra tela de sucesso imediatamente
     document.getElementById('apply-modal-body').innerHTML = `
       <div style="text-align:center;padding:2.5rem 1rem">
         <div style="width:64px;height:64px;border-radius:50%;background:var(--success-l);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
           <i class="ti ti-check" style="font-size:30px;color:var(--success)"></i>
         </div>
         <div style="font-size:18px;font-weight:600;margin-bottom:8px">Candidatura enviada!</div>
-        <div style="font-size:13px;color:var(--muted);line-height:1.7;max-width:320px;margin:0 auto 20px">
-          Nossa IA está analisando seu perfil agora.<br>
-          Acompanhe o status em <strong>Minha área → Minhas candidaturas</strong>.
+        <div style="font-size:13px;color:var(--muted);line-height:1.7;max-width:320px;margin:0 auto 8px">
+          Nossa IA está analisando seu perfil agora.
+        </div>
+        <div id="score-status" style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px;color:var(--accent);margin-bottom:20px">
+          <i class="ti ti-loader-2" style="animation:spin 1s linear infinite;font-size:14px"></i>
+          Calculando compatibilidade...
         </div>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-ghost" onclick="closeModal('m-aplicar');filterJobs()">Ver mais vagas</button>
@@ -879,9 +896,69 @@ async function submitApply() {
       </div>`;
     document.getElementById('apply-foot').style.display = 'none';
     renderJobs(getFilteredJobs());
+
   } catch(e) {
+    nextBtn.innerHTML = 'Enviar candidatura ✓';
+    nextBtn.disabled = false;
     if (e.message.includes('duplicate')) { toast('Você já se candidatou a esta vaga','error'); }
     else { toast('Erro: '+e.message,'error'); }
+  }
+}
+
+async function calcularScorePortal(candidaturaId, candidato, vaga) {
+  // Só tenta se tiver servidor disponível (não arquivo direto)
+  if (window.location.protocol === 'file:') return;
+
+  var prompt = `Analise a compatibilidade entre este candidato e esta vaga de emprego.
+
+CANDIDATO:
+- Nome: ${candidato.nome}
+- Experiência: ${candidato.experiencia_anos || 'não informado'} anos
+- Habilidades: ${(candidato.habilidades||[]).join(', ') || 'não informado'}
+- Localização: ${candidato.localizacao || 'não informado'}
+
+VAGA:
+- Título: ${vaga.titulo}
+- Área: ${vaga.area || ''}
+- Modalidade: ${vaga.modalidade || ''}
+- Requisitos: ${(vaga.requisitos||[]).join(', ') || 'não informado'}
+- Tags/Skills: ${(vaga.tags||[]).join(', ') || 'não informado'}
+- Descrição: ${vaga.descricao || 'não informado'}
+
+Responda EXATAMENTE neste formato JSON (sem mais nada):
+{"score": 85, "analise": "Análise aqui explicando fit técnico, pontos fortes e o que falta"}
+
+Score de 0 a 100. Análise em 3-4 linhas.`;
+
+  var r = await fetch('/api/ai', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 300,
+      system: 'Você é especialista em RH. Responda APENAS com JSON válido, sem markdown.',
+      messages: [{role:'user', content: prompt}]
+    })
+  });
+
+  if (!r.ok) return;
+  var d = await r.json();
+  var text = (d.content[0].text||'').trim().replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+  var result = JSON.parse(text);
+  var score = Math.min(100, Math.max(0, Math.round(result.score)));
+
+  // Salva no banco
+  await sb.from('candidaturas').update({
+    score_ia: score,
+    analise_ia: result.analise || ''
+  }).eq('id', candidaturaId);
+
+  // Atualiza a UI de sucesso se ainda estiver aberta
+  var statusEl = document.getElementById('score-status');
+  if (statusEl) {
+    statusEl.innerHTML = `
+      <i class="ti ti-sparkles" style="font-size:14px;color:var(--success)"></i>
+      <span style="color:var(--success)">Compatibilidade calculada: <strong>${score}%</strong></span>`;
   }
 }
 
