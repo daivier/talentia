@@ -8,7 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style> 
+<style>
 :root{
   --accent:#1a56a0;--accent-l:#e8f0fb;--accent-d:#0d3d7a;
   --success:#2d6a0f;--success-l:#e6f4dc;
@@ -1219,6 +1219,8 @@ async function calcularTodosScores() {
     toast('Scores calculados!', 'success');
   } catch(e) { toast('Erro: '+e.message, 'error'); }
 }
+
+async function avancarEtapa(candidaturaId, etapaAtual) {
   var ordem = ['inscrito','triagem_ia','entrevista_rh','entrevista_tecnica','finalista','oferta','contratado'];
   var idx = ordem.indexOf(etapaAtual);
   if (idx >= ordem.length-1) { toast('Candidato já na última etapa'); return; }
