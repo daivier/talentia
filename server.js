@@ -120,6 +120,8 @@ const server = http.createServer((req, res) => {
   var filePath;
   if (pathname === '/' || pathname === '/index.html') {
     filePath = path.join(__dirname, 'TalentAI_Supabase.html');
+  } else if (pathname === '/portal' || pathname === '/portal/') {
+    filePath = path.join(__dirname, 'portal_candidato.html');
   } else {
     filePath = path.join(__dirname, pathname);
   }
