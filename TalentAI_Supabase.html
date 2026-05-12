@@ -758,7 +758,12 @@ function etapaTag(e) {
 
 function formatDate(d) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit',year:'2-digit'});
+  return new Date(d).toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit',year:'2-digit',timeZone:'America/Sao_Paulo'});
+}
+
+function formatTime(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', timeZone:'America/Sao_Paulo'});
 }
 
 function setDashGreeting() {
@@ -865,7 +870,7 @@ async function loadVagas() {
 
 function renderVagas(list) {
   if (!list.length) { document.getElementById('vagas-tbody-wrap').innerHTML = '<div class="empty-state"><i class="ti ti-briefcase"></i><div>Nenhuma vaga cadastrada</div><button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openModal(\'m-nova-vaga\')">+ Nova vaga</button></div>'; return; }
-  document.getElementById('vagas-tbody-wrap').innerHTML = `<table class="tbl"><thead><tr><th>Cargo</th><th>Área</th><th>Modalidade</th><th>Contrato</th><th>Salário máx.</th><th>Status</th><th>Criada</th><th></th></tr></thead><tbody>`+
+  document.getElementById('vagas-tbody-wrap').innerHTML = `<table class="tbl"><thead><tr><th>Cargo</th><th>Área</th><th>Modalidade</th><th>Contrato</th><th>Salário máx.</th><th>Status</th><th>Criada</th><th>Ações</th></tr></thead><tbody>`+
     list.map(v=>`<tr>
       <td style="font-weight:500">${v.titulo}</td>
       <td><span class="tag tag-gray">${v.area}</span></td>
@@ -874,7 +879,31 @@ function renderVagas(list) {
       <td style="color:var(--success);font-weight:500">${v.salario_max?'R$ '+Number(v.salario_max).toLocaleString('pt-BR'):'—'}</td>
       <td><span class="tag tag-${v.status==='ativa'?'green':v.status==='pausada'?'warn':'red'}">${v.status}</span></td>
       <td style="color:var(--muted);font-size:12px">${formatDate(v.created_at)}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="deleteVaga('${v.id}')"><i class="ti ti-trash" style="font-size:13px"></i></button></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          ${v.status==='ativa' ? `
+            <button class="btn btn-ghost btn-sm" title="Pausar vaga" onclick="alterarStatusVaga('${v.id}','pausada')">
+              <i class="ti ti-player-pause" style="font-size:13px"></i>
+            </button>
+            <button class="btn btn-ghost btn-sm" title="Encerrar vaga" onclick="alterarStatusVaga('${v.id}','encerrada')" style="color:var(--danger)">
+              <i class="ti ti-lock" style="font-size:13px"></i>
+            </button>` : ''}
+          ${v.status==='pausada' ? `
+            <button class="btn btn-ghost btn-sm" title="Reativar vaga" onclick="alterarStatusVaga('${v.id}','ativa')" style="color:var(--success)">
+              <i class="ti ti-player-play" style="font-size:13px"></i>
+            </button>
+            <button class="btn btn-ghost btn-sm" title="Encerrar vaga" onclick="alterarStatusVaga('${v.id}','encerrada')" style="color:var(--danger)">
+              <i class="ti ti-lock" style="font-size:13px"></i>
+            </button>` : ''}
+          ${v.status==='encerrada' ? `
+            <button class="btn btn-ghost btn-sm" title="Reativar vaga" onclick="alterarStatusVaga('${v.id}','ativa')" style="color:var(--success)">
+              <i class="ti ti-player-play" style="font-size:13px"></i>
+            </button>` : ''}
+          <button class="btn btn-ghost btn-sm" title="Excluir vaga" onclick="deleteVaga('${v.id}')">
+            <i class="ti ti-trash" style="font-size:13px"></i>
+          </button>
+        </div>
+      </td>
     </tr>`).join('')+'</tbody></table>';
 }
 
@@ -899,6 +928,25 @@ async function saveVaga() {
     loadVagas();
     loadDashboard();
   } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+async function alterarStatusVaga(id, novoStatus) {
+  var msgs = {pausada:'Pausar esta vaga? Ela ficará invisível no portal de candidatos.', encerrada:'Encerrar esta vaga? Ela será fechada para novas candidaturas.', ativa:'Reativar esta vaga?'};
+  if (!confirm(msgs[novoStatus])) return;
+  if (demoMode) {
+    var v = vagasCache.find(v=>v.id===id);
+    if (v) v.status = novoStatus;
+    renderVagas(vagasCache);
+    toast(`Vaga ${novoStatus}!`, 'success');
+    return;
+  }
+  try {
+    var { error } = await sb.from('vagas').update({status: novoStatus}).eq('id', id);
+    if (error) throw error;
+    toast(`Vaga ${novoStatus}!`, 'success');
+    loadVagas();
+    loadDashboard();
+  } catch(e) { toast('Erro: '+e.message, 'error'); }
 }
 
 async function deleteVaga(id) {
@@ -962,12 +1010,25 @@ async function avancarEtapa(candidaturaId, etapaAtual) {
   var idx = ordem.indexOf(etapaAtual);
   if (idx >= ordem.length-1) { toast('Candidato já na última etapa'); return; }
   var novaEtapa = ordem[idx+1];
-  if (demoMode) { var c = DEMO.candidaturas.find(c=>c.id===candidaturaId); if(c) c.etapa=novaEtapa; loadCandidatos(); toast('Avançado para: '+etapaLabel(novaEtapa),'success'); return; }
+  if (demoMode) {
+    var c = DEMO.candidaturas.find(c=>c.id===candidaturaId);
+    if(c) c.etapa=novaEtapa;
+    toast('Avançado para: '+etapaLabel(novaEtapa),'success');
+    // Recarrega a view ativa
+    var viewAtiva = document.querySelector('.view.active')?.id;
+    if (viewAtiva === 'v-pipeline') loadPipeline();
+    else if (viewAtiva === 'v-candidatos') loadCandidatos();
+    return;
+  }
   try {
     var { error } = await sb.from('candidaturas').update({etapa:novaEtapa}).eq('id',candidaturaId);
     if (error) throw error;
     toast('Avançado para: '+etapaLabel(novaEtapa),'success');
-    loadCandidatos();
+    // Recarrega a view ativa automaticamente
+    var viewAtiva = document.querySelector('.view.active')?.id;
+    if (viewAtiva === 'v-pipeline') loadPipeline();
+    else if (viewAtiva === 'v-candidatos') loadCandidatos();
+    else if (viewAtiva === 'v-dash') loadDashboard();
   } catch(e) { toast('Erro: '+e.message,'error'); }
 }
 
@@ -1012,12 +1073,28 @@ async function saveCandidato() {
   var payload = {nome,email,telefone:document.getElementById('nc-telefone').value,linkedin:document.getElementById('nc-linkedin').value,localizacao:document.getElementById('nc-local').value,experiencia_anos:Number(document.getElementById('nc-exp').value)||null,habilidades:skills,consentimento_lgpd:document.getElementById('nc-lgpd').checked};
   if (demoMode) { DEMO.candidaturas.push({id:Date.now().toString(),candidato_nome:nome,candidato_email:email,vaga_titulo:'—',etapa:'inscrito',score_ia:0,aplicado_em:new Date().toISOString()}); closeModal('m-novo-candidato'); loadCandidatos(); toast('Candidato adicionado (demo)','success'); return; }
   try {
+    // Verificar se e-mail já existe
+    var { data: existe } = await sb.from('candidatos').select('id,nome').eq('email', email).single();
+    if (existe) {
+      toast(`E-mail já cadastrado para: ${existe.nome}`, 'error');
+      document.getElementById('nc-email').style.borderColor = 'var(--danger)';
+      document.getElementById('nc-email').focus();
+      return;
+    }
     var { error } = await sb.from('candidatos').insert(payload);
     if (error) throw error;
     closeModal('m-novo-candidato');
+    document.getElementById('nc-email').style.borderColor = '';
     toast('Candidato salvo no banco!','success');
     loadCandidatos();
-  } catch(e) { toast('Erro: '+e.message,'error'); }
+  } catch(e) {
+    if (e.message && e.message.includes('duplicate key')) {
+      toast('Este e-mail já está cadastrado no sistema.', 'error');
+      document.getElementById('nc-email').style.borderColor = 'var(--danger)';
+    } else {
+      toast('Erro: '+e.message,'error');
+    }
+  }
 }
 
 async function loadPipeline() {
@@ -1102,7 +1179,7 @@ async function loadEntrevistas() {
       <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
         <div style="flex-shrink:0;width:60px;text-align:center">
           <div style="font-size:11px;color:var(--muted)">${formatDate(e.data_hora)}</div>
-          <div style="font-size:14px;font-weight:600;color:var(--accent)">${e.data_hora?new Date(e.data_hora).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—'}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)">${formatTime(e.data_hora)}</div>
         </div>
         <div class="av">${initials(e.candidato_nome)}</div>
         <div style="flex:1">
@@ -1119,7 +1196,7 @@ async function saveEntrevista() {
   var data = document.getElementById('ag-data').value;
   var hora = document.getElementById('ag-hora').value;
   if (!cid || !data || !hora) { toast('Preencha todos os campos','error'); return; }
-  var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00`,tipo:document.getElementById('ag-tipo').value,formato:document.getElementById('ag-formato').value,link_video:document.getElementById('ag-link').value||null,status:'agendada'};
+  var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00-03:00`,tipo:document.getElementById('ag-tipo').value,formato:document.getElementById('ag-formato').value,link_video:document.getElementById('ag-link').value||null,status:'agendada'};
   if (demoMode) { DEMO.entrevistas.push({...payload,id:Date.now().toString(),candidato_nome:'Novo candidato',vaga_titulo:'—'}); closeModal('m-agendar'); loadEntrevistas(); toast('Entrevista agendada (demo)','success'); return; }
   try {
     var { error } = await sb.from('entrevistas').insert(payload);
@@ -1346,11 +1423,14 @@ async function genEmailAI() {
   p.style.display = 'block';
   p.textContent = 'Gerando com IA...';
   try {
-    var r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:400,system:'Escreva e-mails profissionais de RH. Use variáveis {nome},{cargo},{empresa}. Tom humano e acolhedor. Em português.',messages:[{role:'user',content:`E-mail de ${document.getElementById('et-gatilho').value.replace(/_/g,' ')} para candidato a uma vaga.`}]})});
-    var d = await r.json();
-    p.textContent = d.content[0].text;
-    document.getElementById('et-corpo').value = d.content[0].text;
-  } catch(e) { p.textContent = 'Erro.'; }
+    var reply = await callAI(
+      'Escreva e-mails profissionais de RH. Use variáveis {nome},{cargo},{empresa}. Tom humano e acolhedor. Em português.',
+      `E-mail de ${document.getElementById('et-gatilho').value.replace(/_/g,' ')} para candidato a uma vaga.`,
+      400
+    );
+    p.textContent = reply;
+    document.getElementById('et-corpo').value = reply;
+  } catch(e) { p.textContent = 'Erro: ' + e.message; }
 }
 
 // ============================================================
@@ -1426,6 +1506,34 @@ async function loadIAContext() {
   el.innerHTML = ctx.split('\n').map(l=>`<div style="padding:3px 0;border-bottom:1px solid var(--border)">${l}</div>`).join('');
 }
 
+// Detecta se está rodando via servidor local ou direto no navegador
+var AI_ENDPOINT = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? '/api/ai'
+  : null; // Direto do arquivo não funciona por CORS
+
+async function callAI(system, userMsg, maxTokens) {
+  maxTokens = maxTokens || 600;
+  if (!AI_ENDPOINT) {
+    return '⚠️ O Assistente IA só funciona quando o sistema é acessado via servidor local (node server.js).\n\nAbra o terminal na pasta do projeto e rode:\n\n  node server.js\n\nDepois acesse http://localhost:3000';
+  }
+  var r = await fetch(AI_ENDPOINT, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: maxTokens,
+      system: system,
+      messages: [{role: 'user', content: userMsg}]
+    })
+  });
+  if (!r.ok) {
+    var err = await r.json().catch(() => ({}));
+    throw new Error(err.error || 'Erro na API');
+  }
+  var d = await r.json();
+  return d.content[0].text;
+}
+
 async function sendAI() {
   var inp = document.getElementById('ai-input'), msg = inp.value.trim();
   if (!msg) return;
@@ -1436,10 +1544,11 @@ async function sendAI() {
   msgs.scrollTop = msgs.scrollHeight;
   try {
     var system = `Você é um assistente de RH especializado. Responda em português brasileiro, seja objetivo e use emojis para organizar visualmente. Contexto atual do banco de dados:\n${iaContext}`;
-    var r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system,messages:[{role:'user',content:msg}]})});
-    var d = await r.json();
-    document.getElementById('ai-typing').innerHTML = `<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;line-height:1.6">${(d.content[0].text||'').replace(/\n/g,'<br>')}</div>`;
-  } catch(e) { document.getElementById('ai-typing').innerHTML = '<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px">Erro de conexão.</div>'; }
+    var reply = await callAI(system, msg, 600);
+    document.getElementById('ai-typing').innerHTML = `<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;
+  } catch(e) {
+    document.getElementById('ai-typing').innerHTML = `<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;color:var(--danger)">Erro: ${e.message}</div>`;
+  }
   msgs.scrollTop = msgs.scrollHeight;
 }
 

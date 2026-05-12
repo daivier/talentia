@@ -1,0 +1,11 @@
+{
+  "name": "talentai",
+  "version": "1.0.0",
+  "description": "Sistema de RH com IA — TalentAI",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {}
+}
