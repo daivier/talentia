@@ -1506,15 +1506,15 @@ async function loadIAContext() {
   el.innerHTML = ctx.split('\n').map(l=>`<div style="padding:3px 0;border-bottom:1px solid var(--border)">${l}</div>`).join('');
 }
 
-// Detecta se está rodando via servidor local ou direto no navegador
-var AI_ENDPOINT = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? '/api/ai'
-  : null; // Direto do arquivo não funciona por CORS
+// Detecta se está rodando via servidor (local ou Railway) ou arquivo direto
+var AI_ENDPOINT = window.location.protocol === 'file:'
+  ? null  // Aberto como arquivo direto — sem servidor
+  : '/api/ai'; // Rodando via servidor (local, Railway, Render, etc)
 
 async function callAI(system, userMsg, maxTokens) {
   maxTokens = maxTokens || 600;
   if (!AI_ENDPOINT) {
-    return '⚠️ O Assistente IA só funciona quando o sistema é acessado via servidor local (node server.js).\n\nAbra o terminal na pasta do projeto e rode:\n\n  node server.js\n\nDepois acesse http://localhost:3000';
+    return '⚠️ O Assistente IA só funciona quando o sistema é acessado via servidor.\n\nRode localmente com:\n  node server.js\n\nOu faça deploy no Railway.';
   }
   var r = await fetch(AI_ENDPOINT, {
     method: 'POST',
