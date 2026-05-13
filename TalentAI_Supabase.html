@@ -422,13 +422,23 @@ button{cursor:pointer;}
 
     <!-- MENSAGENS -->
     <div class="view" id="v-mensagens">
-      <div class="page-hd"><div><div class="page-title">Mensagens</div><div class="page-sub">Comunicação com candidatos</div></div></div>
+      <div class="page-hd">
+        <div><div class="page-title">Mensagens</div><div class="page-sub">Comunicação com candidatos</div></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="loadMensagens()"><i class="ti ti-refresh"></i></button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-nova-mensagem')"><i class="ti ti-pencil"></i> Nova mensagem</button>
+        </div>
+      </div>
       <div class="g2" style="align-items:start">
         <div class="card" style="padding:.75rem">
           <div id="msgs-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div></div>
         </div>
-        <div class="card" id="msg-chat-panel">
-          <div class="empty-state"><i class="ti ti-message-dots"></i><div style="font-size:13px">Selecione uma conversa</div></div>
+        <div class="card" style="padding:0" id="msg-chat-panel">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--muted)">
+            <i class="ti ti-message-dots" style="font-size:40px;margin-bottom:10px;color:var(--hint)"></i>
+            <div style="font-size:13px">Selecione uma conversa</div>
+            <div style="font-size:11px;margin-top:4px;color:var(--hint)">ou inicie uma nova mensagem</div>
+          </div>
         </div>
       </div>
     </div>
@@ -505,6 +515,31 @@ button{cursor:pointer;}
 
 <!-- MODALS -->
 <!-- MODAL: DETALHE DO CANDIDATO -->
+<div class="modal-overlay" id="m-nova-mensagem">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-hd">
+      <div class="modal-title">Nova mensagem</div>
+      <button class="modal-close" onclick="closeModal('m-nova-mensagem')"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label-sm">Candidato / Candidatura</label>
+        <select class="f-input" id="nm-candidatura">
+          <option value="">Selecione um candidato...</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label-sm">Mensagem</label>
+        <textarea class="f-input" id="nm-texto" rows="4" placeholder="Escreva sua mensagem..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-nova-mensagem')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="enviarNovaMensagem()"><i class="ti ti-send"></i> Enviar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="m-candidato">
   <div class="modal-box" style="max-width:620px">
     <div class="modal-hd">
@@ -1117,7 +1152,7 @@ async function openCandidatoDetail(candidatoId, candidaturaId) {
     foot.innerHTML = `
       <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato')">Fechar</button>
       ${candidaturaId ? `
-        <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-msgs')"><i class="ti ti-message"></i> Mensagem</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-mensagens');abrirChatCandidato('${candidaturaId}','${c.nome}')"><i class="ti ti-message"></i> Mensagem</button>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-agenda')"><i class="ti ti-calendar"></i> Agendar</button>
         <button class="btn btn-primary btn-sm" onclick="avancarEtapa('${candidaturaId}','${cand?.etapa||'inscrito'}');closeModal('m-candidato')">
           <i class="ti ti-arrow-right"></i> Avançar etapa
@@ -1525,57 +1560,164 @@ function renderEtapasChart(data) {
 // ============================================================
 async function loadMensagens() {
   var el = document.getElementById('msgs-list');
+  el.innerHTML = '<div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div>';
   if (demoMode) {
     el.innerHTML = ['Lucas Ferreira','Ana Carolina','Rafael Mendes'].map((n,i)=>`
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);cursor:pointer;background:${i===0?'var(--accent-l)':''}">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);cursor:pointer;background:${i===0?'var(--accent-l)':''}" onclick="openChat('demo-${i}','${n}')">
         <div class="av">${initials(n)}</div>
-        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${n}</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Mensagem de exemplo...</div></div>
-        <div style="text-align:right"><div style="font-size:10px;color:var(--hint)">${i===0?'10min':'Ontem'}</div>${i===0?'<div style="font-size:9px;background:var(--accent);color:#fff;border-radius:20px;padding:1px 6px;margin-top:2px">2</div>':''}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${n}</div><div style="font-size:11px;color:var(--muted)">Mensagem de exemplo...</div></div>
+        ${i===0?'<div style="font-size:9px;background:var(--accent);color:#fff;border-radius:20px;padding:2px 7px">2</div>':''}
       </div>`).join('');
+    populateNovaMensagemSelect([]);
     return;
   }
   try {
-    var { data } = await sb.from('mensagens').select(`*, candidaturas(candidatos(nome,email))`).order('created_at',{ascending:false}).limit(20);
+    var { data } = await sb.from('mensagens')
+      .select('candidatura_id, remetente_tipo, lida, conteudo, created_at, candidaturas(candidatos(nome), vagas(titulo))')
+      .order('created_at', {ascending:false});
     var convs = {};
     (data||[]).forEach(m => {
-      var nome = m.candidaturas?.candidatos?.nome || 'Desconhecido';
       var cid = m.candidatura_id;
-      if (!convs[cid]) convs[cid] = {nome, msgs:[], lidas:0};
-      convs[cid].msgs.push(m);
-      if (!m.lida) convs[cid].lidas++;
+      if (!convs[cid]) convs[cid] = {
+        candidatura_id: cid,
+        nome: m.candidaturas?.candidatos?.nome || 'Desconhecido',
+        vaga: m.candidaturas?.vagas?.titulo || '—',
+        ultima: m.conteudo,
+        nao_lidas: 0
+      };
+      if (!m.lida && m.remetente_tipo === 'candidato') convs[cid].nao_lidas++;
     });
-    el.innerHTML = !Object.keys(convs).length ? '<div class="empty-state"><i class="ti ti-message-dots"></i>Nenhuma mensagem</div>' :
-      Object.entries(convs).map(([cid,c])=>`
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);cursor:pointer${c.lidas?';background:var(--accent-l)':''}" onclick="openChat('${cid}','${c.nome}')">
+    var lista = Object.values(convs);
+    populateNovaMensagemSelect(lista);
+    if (!lista.length) {
+      el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted)">
+        <i class="ti ti-message-dots" style="font-size:32px;display:block;margin-bottom:8px;color:var(--hint)"></i>
+        <div style="font-size:13px">Nenhuma conversa ainda</div>
+        <div style="font-size:11px;margin-top:4px">Clique em "Nova mensagem" para iniciar</div>
+      </div>`;
+      return;
+    }
+    el.innerHTML = lista.map(c=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);cursor:pointer;${c.nao_lidas?'background:var(--accent-l)':''}"
+        onclick="abrirChatCandidato('${c.candidatura_id}','${c.nome}')">
         <div class="av">${initials(c.nome)}</div>
-        <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500">${c.nome}</div><div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.msgs[0]?.conteudo||''}</div></div>
-        ${c.lidas?`<div style="font-size:9px;background:var(--accent);color:#fff;border-radius:20px;padding:1px 6px">${c.lidas}</div>`:''}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:${c.nao_lidas?'600':'500'}">${c.nome}</div>
+          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.ultima||c.vaga}</div>
+        </div>
+        ${c.nao_lidas?`<div style="font-size:9px;font-weight:700;background:var(--accent);color:#fff;border-radius:20px;padding:2px 7px">${c.nao_lidas}</div>`:''}
       </div>`).join('');
-  } catch(e) { el.innerHTML=`<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; }
+  } catch(e) { el.innerHTML=`<div style="padding:1rem;color:var(--danger);font-size:12px">Erro: ${e.message}</div>`; }
+}
+
+function populateNovaMensagemSelect(convs) {
+  if (!demoMode) {
+    sb.from('candidaturas').select('id, candidatos(nome), vagas(titulo)').then(({data}) => {
+      var sel = document.getElementById('nm-candidatura');
+      if (!sel) return;
+      sel.innerHTML = '<option value="">Selecione um candidato...</option>' +
+        (data||[]).map(c=>`<option value="${c.id}">${c.candidatos?.nome||'?'} — ${c.vagas?.titulo||'?'}</option>`).join('');
+    });
+  }
+}
+
+function abrirChatCandidato(candidaturaId, nome) {
+  if (document.querySelector('.view.active')?.id !== 'v-mensagens') {
+    openView('v-mensagens');
+    setTimeout(() => openChat(candidaturaId, nome), 300);
+  } else {
+    openChat(candidaturaId, nome);
+  }
 }
 
 async function openChat(candidaturaId, nome) {
   var panel = document.getElementById('msg-chat-panel');
-  panel.innerHTML = `<div class="card-hd"><div class="card-title">${nome}</div></div><div id="chat-content" style="min-height:180px"><div class="loading"><i class="ti ti-loader-2"></i></div></div><div style="display:flex;gap:8px;margin-top:12px"><input style="flex:1;border:1px solid var(--border);border-radius:var(--r-md);padding:7px 10px;font-size:12px;background:var(--bg)" id="chat-reply" placeholder="Responder..."><button class="btn btn-primary btn-sm" onclick="sendMsg('${candidaturaId}')"><i class="ti ti-send" style="font-size:13px"></i></button></div>`;
+  panel.innerHTML = `
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--accent-l);border-radius:var(--r-lg) var(--r-lg) 0 0">
+      <div class="av">${initials(nome)}</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">${nome}</div></div>
+    </div>
+    <div id="chat-msgs-panel" style="padding:14px;display:flex;flex-direction:column;gap:8px;min-height:200px;max-height:320px;overflow-y:auto">
+      <div class="loading"><i class="ti ti-loader-2"></i></div>
+    </div>
+    <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <input id="chat-reply-input" style="flex:1;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;font-size:12px;background:var(--bg);color:var(--text)" placeholder="Escreva uma mensagem..." onkeydown="if(event.key==='Enter')enviarMensagem('${candidaturaId}')">
+      <button class="btn btn-primary btn-sm" onclick="enviarMensagem('${candidaturaId}')"><i class="ti ti-send" style="font-size:13px"></i></button>
+    </div>`;
+
+  if (demoMode || !candidaturaId || candidaturaId.startsWith('demo-')) {
+    document.getElementById('chat-msgs-panel').innerHTML = `
+      <div style="align-self:flex-start;max-width:85%;background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px">Olá! Tenho interesse na vaga.</div>
+      <div style="align-self:flex-end;max-width:85%;background:var(--accent);color:#fff;border-radius:10px 10px 4px 10px;padding:8px 12px;font-size:12px">Ficamos impressionados com seu perfil!</div>`;
+    return;
+  }
   try {
-    var { data } = await sb.from('mensagens').select('*').eq('candidatura_id',candidaturaId).order('created_at');
-    document.getElementById('chat-content').innerHTML = (data||[]).map(m=>`
-      <div style="display:flex;justify-content:${m.remetente_tipo==='rh'?'flex-end':'flex-start'};margin-bottom:8px">
-        <div style="max-width:80%;background:${m.remetente_tipo==='rh'?'var(--accent)':'var(--bg)'};color:${m.remetente_tipo==='rh'?'#fff':'var(--text)'};border-radius:10px;padding:8px 12px;font-size:12px;line-height:1.5">${m.conteudo}</div>
-      </div>`).join('') || '<div class="empty-state" style="padding:1rem"><i class="ti ti-message"></i><div>Sem mensagens</div></div>';
-  } catch(e) {}
+    var { data } = await sb.from('mensagens').select('*').eq('candidatura_id', candidaturaId).order('created_at');
+    await sb.from('mensagens').update({lida:true}).eq('candidatura_id',candidaturaId).eq('remetente_tipo','candidato');
+    var chatEl = document.getElementById('chat-msgs-panel');
+    chatEl.innerHTML = !(data||[]).length
+      ? `<div style="text-align:center;padding:2rem;color:var(--muted);font-size:12px">Nenhuma mensagem ainda. Inicie a conversa!</div>`
+      : data.map(m=>`
+        <div style="display:flex;justify-content:${m.remetente_tipo==='rh'?'flex-end':'flex-start'}">
+          <div style="max-width:80%;background:${m.remetente_tipo==='rh'?'var(--accent)':'var(--bg)'};color:${m.remetente_tipo==='rh'?'#fff':'var(--text)'};border-radius:${m.remetente_tipo==='rh'?'10px 10px 4px 10px':'4px 10px 10px 10px'};padding:8px 12px;font-size:12px;line-height:1.5">
+            ${m.conteudo}
+            <div style="font-size:9px;opacity:.6;margin-top:3px;text-align:right">${new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})}</div>
+          </div>
+        </div>`).join('');
+    chatEl.scrollTop = chatEl.scrollHeight;
+    loadMensagens();
+  } catch(e) {
+    document.getElementById('chat-msgs-panel').innerHTML = `<div style="padding:1rem;color:var(--danger);font-size:12px">Erro: ${e.message}</div>`;
+  }
 }
 
-async function sendMsg(candidaturaId) {
-  var inp = document.getElementById('chat-reply');
-  var msg = inp.value.trim();
+async function enviarMensagem(candidaturaId) {
+  var inp = document.getElementById('chat-reply-input');
+  var msg = inp?.value?.trim();
   if (!msg) return;
   inp.value = '';
+  if (demoMode || !candidaturaId || candidaturaId.startsWith('demo-')) {
+    var chat = document.getElementById('chat-msgs-panel');
+    chat.innerHTML += `<div style="display:flex;justify-content:flex-end"><div style="max-width:80%;background:var(--accent);color:#fff;border-radius:10px 10px 4px 10px;padding:8px 12px;font-size:12px">${msg}</div></div>`;
+    chat.scrollTop = chat.scrollHeight;
+    return;
+  }
   try {
-    var { error } = await sb.from('mensagens').insert({candidatura_id:candidaturaId,remetente_tipo:'rh',remetente_id:(await sb.auth.getUser()).data.user?.id||'demo',conteudo:msg});
+    var { error } = await sb.from('mensagens').insert({
+      candidatura_id: candidaturaId,
+      remetente_tipo: 'rh',
+      remetente_id: '00000000-0000-0000-0000-000000000000',
+      conteudo: msg,
+      lida: false
+    });
     if (error) throw error;
-    openChat(candidaturaId, '');
-  } catch(e) { toast('Erro: '+e.message,'error'); }
+    openChat(candidaturaId, document.querySelector('#msg-chat-panel .av')?.textContent || '');
+  } catch(e) { toast('Erro: '+e.message, 'error'); }
+}
+
+async function enviarNovaMensagem() {
+  var cid = document.getElementById('nm-candidatura').value;
+  var texto = document.getElementById('nm-texto').value.trim();
+  if (!cid) { toast('Selecione um candidato','error'); return; }
+  if (!texto) { toast('Escreva uma mensagem','error'); return; }
+  if (demoMode) { closeModal('m-nova-mensagem'); toast('Mensagem enviada (demo)','success'); return; }
+  try {
+    var { error } = await sb.from('mensagens').insert({
+      candidatura_id: cid,
+      remetente_tipo: 'rh',
+      remetente_id: '00000000-0000-0000-0000-000000000000',
+      conteudo: texto,
+      lida: false
+    });
+    if (error) throw error;
+    var sel = document.getElementById('nm-candidatura');
+    var nomeSel = sel.options[sel.selectedIndex]?.text?.split(' — ')[0] || '';
+    document.getElementById('nm-texto').value = '';
+    closeModal('m-nova-mensagem');
+    toast('Mensagem enviada!','success');
+    loadMensagens();
+    setTimeout(() => openChat(cid, nomeSel), 300);
+  } catch(e) { toast('Erro: '+e.message, 'error'); }
 }
 
 // ============================================================
