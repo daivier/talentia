@@ -257,7 +257,7 @@ button{cursor:pointer;}
     <h1 class="hero-title">Encontre sua próxima oportunidade</h1>
     <p class="hero-sub">Candidate-se em segundos. Nossa IA analisa seu perfil automaticamente.</p>
     <div class="hero-search">
-      <input id="search-input" placeholder="Cargo, habilidade ou empresa..." oninput="filterJobs()">
+      <input id="search-input" placeholder="Cargo, habilidade ou empresa..." oninput="filterJobs()" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <button onclick="filterJobs()"><i class="ti ti-search" style="font-size:14px"></i> Buscar</button>
     </div>
     <div class="hero-chips">
@@ -1061,6 +1061,10 @@ function showTab(id) {
   document.getElementById('tab-vagas').style.display = 'none';
   document.getElementById('tab-minha-area').style.display = 'none';
   document.getElementById(id).style.display = 'block';
+  if (id === 'tab-vagas') {
+    document.getElementById('search-input').value = '';
+    filterJobs();
+  }
   if (id==='tab-minha-area') loadMinhasApps();
 }
 
