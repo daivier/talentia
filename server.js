@@ -4,6 +4,8 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+// ── Envio de e-mail via Nodemailer ──────────────────────
+const nodemailer = require('nodemailer');
 
 function loadEnv() {
   try {
@@ -39,97 +41,41 @@ const MIME = {
   '.ico':  'image/x-icon',
 };
 
-// ── Envio de e-mail via SMTP (sem dependências externas) ──
-function sendEmail(to, subject, body) {
-  return new Promise((resolve, reject) => {
-    if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
-      return reject(new Error('SMTP não configurado'));
-    }
+const transporter = nodemailer.createTransport({
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_SECURE,
+  auth: {
+    user: SMTP_USER,
+    pass: SMTP_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false
+  }
+});
 
-    const net = SMTP_SECURE ? require('tls') : require('net');
-    const socket = net.connect(SMTP_PORT, SMTP_HOST);
-    let buffer = '';
-    let step = 0;
-
-    // Codifica base64
-    const b64 = (s) => Buffer.from(s).toString('base64');
-
-    // Corpo do e-mail em HTML
-    const boundary = 'boundary_' + Date.now();
-    const emailBody = [
-      `From: TalentAI <${SMTP_FROM}>`,
-      `To: ${to}`,
-      `Subject: =?UTF-8?B?${b64(subject)}?=`,
-      `MIME-Version: 1.0`,
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      ``,
-      `--${boundary}`,
-      `Content-Type: text/plain; charset=UTF-8`,
-      `Content-Transfer-Encoding: base64`,
-      ``,
-      b64(body.replace(/<[^>]+>/g, '')),
-      ``,
-      `--${boundary}`,
-      `Content-Type: text/html; charset=UTF-8`,
-      `Content-Transfer-Encoding: base64`,
-      ``,
-      b64(`<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
-        <div style="background:#1a56a0;padding:20px;border-radius:8px 8px 0 0;text-align:center">
-          <h2 style="color:#fff;margin:0">TalentAI</h2>
-        </div>
-        <div style="background:#fff;padding:24px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px">
-          ${body.replace(/\n/g,'<br>')}
-        </div>
-        <p style="text-align:center;font-size:11px;color:#999;margin-top:16px">
-          Este e-mail foi enviado automaticamente pelo sistema TalentAI.<br>
-          Por favor não responda diretamente a este e-mail.
-        </p>
-      </body></html>`),
-      ``,
-      `--${boundary}--`,
-    ].join('\r\n');
-
-    const commands = [
-      `EHLO talentai\r\n`,
-      `AUTH LOGIN\r\n`,
-      b64(SMTP_USER) + '\r\n',
-      b64(SMTP_PASS) + '\r\n',
-      `MAIL FROM:<${SMTP_FROM}>\r\n`,
-      `RCPT TO:<${to}>\r\n`,
-      `DATA\r\n`,
-      emailBody + '\r\n.\r\n',
-      `QUIT\r\n`,
-    ];
-
-    socket.on('data', (data) => {
-      buffer += data.toString();
-      const lines = buffer.split('\r\n');
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        console.log('SMTP <', line);
-        const code = parseInt(line.substring(0, 3));
-
-        if (line.includes('-')) continue; // multi-line response
-
-        if (code === 220 && step === 0) { socket.write(commands[step++]); }
-        else if ((code === 250 || code === 220) && step === 1) { socket.write(commands[step++]); }
-        else if (code === 334 && step === 2) { socket.write(commands[step++]); }
-        else if (code === 334 && step === 3) { socket.write(commands[step++]); }
-        else if (code === 235 && step === 4) { socket.write(commands[step++]); }
-        else if (code === 250 && step === 5) { socket.write(commands[step++]); }
-        else if (code === 250 && step === 6) { socket.write(commands[step++]); }
-        else if (code === 354 && step === 7) { socket.write(commands[step++]); }
-        else if (code === 250 && step === 8) { socket.write(commands[step++]); resolve({ success: true }); }
-        else if (code === 221) { socket.destroy(); }
-        else if (code >= 400) { socket.destroy(); reject(new Error(`SMTP erro ${code}: ${line}`)); }
-      }
-    });
-
-    socket.on('error', reject);
-    socket.on('timeout', () => { socket.destroy(); reject(new Error('SMTP timeout')); });
-    socket.setTimeout(15000);
+async function sendEmail(to, subject, body) {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    throw new Error('SMTP não configurado');
+  }
+  var info = await transporter.sendMail({
+    from: `TalentAI RH <${SMTP_FROM}>`,
+    to: to,
+    subject: subject,
+    text: body.replace(/<[^>]+>/g, ''),
+    html: `<!DOCTYPE html><html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+      <div style="background:#1a56a0;padding:20px;border-radius:8px 8px 0 0;text-align:center">
+        <h2 style="color:#fff;margin:0">TalentAI</h2>
+      </div>
+      <div style="background:#fff;padding:24px;border:1px solid #e0e0e0;border-top:none;border-radius:0 0 8px 8px">
+        ${body.replace(/\n/g,'<br>')}
+      </div>
+      <p style="text-align:center;font-size:11px;color:#999;margin-top:16px">
+        E-mail automático do sistema TalentAI — não responda este e-mail.
+      </p>
+    </body></html>`
   });
+  return { success: true, messageId: info.messageId };
 }
 
 // ── Substitui variáveis no template ──────────────────────
