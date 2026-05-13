@@ -295,6 +295,9 @@ button{cursor:pointer;}
       <div class="tabs">
         <button class="tab active" onclick="innerTab('inner-candidaturas',this)">Minhas candidaturas</button>
         <button class="tab" onclick="innerTab('inner-perfil',this)">Meu perfil</button>
+        <button class="tab" id="tab-msgs-btn" onclick="innerTab('inner-mensagens',this);loadMensagensPortal()">
+          Mensagens <span id="msgs-badge" style="display:none;font-size:9px;background:var(--accent);color:#fff;border-radius:20px;padding:1px 6px;margin-left:2px">0</span>
+        </button>
       </div>
 
       <div id="inner-candidaturas">
@@ -329,6 +332,25 @@ button{cursor:pointer;}
           </div>
         </div>
       </div>
+
+      <!-- MENSAGENS -->
+      <div id="inner-mensagens" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start">
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh)">
+            <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;background:var(--bg)">Conversas com o RH</div>
+            <div id="portal-convs-list" style="padding:8px;min-height:100px">
+              <div style="text-align:center;padding:2rem;color:var(--muted)"><i class="ti ti-loader-2" style="font-size:24px;display:block;margin-bottom:8px;animation:spin 1s linear infinite"></i>Carregando...</div>
+            </div>
+          </div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--sh)" id="portal-chat-panel">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:250px;color:var(--muted)">
+              <i class="ti ti-message-dots" style="font-size:36px;margin-bottom:10px;color:var(--hint)"></i>
+              <div style="font-size:13px">Selecione uma conversa</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -1076,6 +1098,8 @@ function showTab(id) {
 function innerTab(id, el) {
   document.getElementById('inner-candidaturas').style.display = 'none';
   document.getElementById('inner-perfil').style.display = 'none';
+  var msgsEl = document.getElementById('inner-mensagens');
+  if (msgsEl) msgsEl.style.display = 'none';
   document.getElementById(id).style.display = 'block';
   document.querySelectorAll('#tab-minha-area .tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
@@ -1106,6 +1130,122 @@ function formatDateShort(d) {
   if (days<7) return days+'d atrás';
   if (days<30) return Math.floor(days/7)+'sem atrás';
   return new Date(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+}
+
+// ============================================================
+// MENSAGENS PORTAL
+// ============================================================
+async function loadMensagensPortal() {
+  if (!currentCandidato) {
+    document.getElementById('portal-convs-list').innerHTML = `
+      <div style="text-align:center;padding:1.5rem;color:var(--muted)">
+        <div style="font-size:12px">Faça login para ver suas mensagens</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="openModal('m-login')">Entrar</button>
+      </div>`;
+    return;
+  }
+  var el = document.getElementById('portal-convs-list');
+  el.innerHTML = '<div style="text-align:center;padding:1.5rem;color:var(--muted)"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite;font-size:20px"></i></div>';
+  try {
+    // Busca todas as candidaturas do candidato
+    var { data: cands } = await sb.from('candidaturas')
+      .select('id, vagas(titulo), mensagens(id, conteudo, remetente_tipo, lida, created_at)')
+      .eq('candidato_id', currentCandidato.id);
+
+    var lista = (cands||[]).filter(c => (c.mensagens||[]).length > 0);
+    var totalNaoLidas = 0;
+
+    if (!lista.length) {
+      el.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--muted)">
+        <i class="ti ti-message-dots" style="font-size:28px;display:block;margin-bottom:8px;color:var(--hint)"></i>
+        <div style="font-size:13px">Nenhuma mensagem ainda</div>
+        <div style="font-size:11px;margin-top:4px">O RH entrará em contato por aqui</div>
+      </div>`;
+      return;
+    }
+
+    el.innerHTML = lista.map(c => {
+      var msgs = c.mensagens || [];
+      var ultima = msgs[msgs.length-1];
+      var naoLidas = msgs.filter(m => !m.lida && m.remetente_tipo === 'rh').length;
+      totalNaoLidas += naoLidas;
+      return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--r-md);cursor:pointer;${naoLidas?'background:var(--accent-l)':''}"
+        onclick="abrirChatPortal('${c.id}','${(c.vagas?.titulo||'RH').replace(/'/g,"\'")}')">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0">RH</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:${naoLidas?'600':'500'}">${c.vagas?.titulo||'—'}</div>
+          <div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ultima?.conteudo||'...'}</div>
+        </div>
+        ${naoLidas?`<div style="font-size:9px;font-weight:700;background:var(--accent);color:#fff;border-radius:20px;padding:2px 7px;flex-shrink:0">${naoLidas}</div>`:''}
+      </div>`;
+    }).join('');
+
+    // Atualiza badge na aba
+    var badge = document.getElementById('msgs-badge');
+    if (badge) {
+      if (totalNaoLidas > 0) { badge.style.display='inline'; badge.textContent=totalNaoLidas; }
+      else { badge.style.display='none'; }
+    }
+  } catch(e) {
+    el.innerHTML = `<div style="padding:1rem;color:var(--danger);font-size:12px">Erro: ${e.message}</div>`;
+  }
+}
+
+async function abrirChatPortal(candidaturaId, vagaTitulo) {
+  var panel = document.getElementById('portal-chat-panel');
+  panel.innerHTML = `
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--accent-l)">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0">RH</div>
+      <div style="flex:1"><div style="font-size:13px;font-weight:600">RH — ${vagaTitulo}</div><div style="font-size:11px;color:var(--muted)">Equipe de recrutamento</div></div>
+    </div>
+    <div id="portal-msgs" style="padding:14px;display:flex;flex-direction:column;gap:8px;min-height:200px;max-height:320px;overflow-y:auto">
+      <div style="text-align:center;padding:1rem;color:var(--muted)"><i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i></div>
+    </div>
+    <div style="padding:8px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
+      <input id="portal-reply-input" style="flex:1;border:1px solid var(--border);border-radius:var(--r-md);padding:8px 10px;font-size:12px;background:var(--bg);color:var(--text)" placeholder="Responder ao RH..." onkeydown="if(event.key==='Enter')enviarRespostaPortal('${candidaturaId}')">
+      <button class="btn btn-primary btn-sm" onclick="enviarRespostaPortal('${candidaturaId}')"><i class="ti ti-send" style="font-size:13px"></i></button>
+    </div>`;
+
+  try {
+    var { data } = await sb.from('mensagens').select('*').eq('candidatura_id', candidaturaId).order('created_at');
+    // Marca como lidas as do RH
+    await sb.from('mensagens').update({lida:true}).eq('candidatura_id',candidaturaId).eq('remetente_tipo','rh');
+
+    var msgsEl = document.getElementById('portal-msgs');
+    msgsEl.innerHTML = !(data||[]).length
+      ? `<div style="text-align:center;padding:2rem;color:var(--muted);font-size:12px">Nenhuma mensagem ainda.</div>`
+      : data.map(m => `
+        <div style="display:flex;justify-content:${m.remetente_tipo==='candidato'?'flex-end':'flex-start'}">
+          <div style="max-width:80%;background:${m.remetente_tipo==='candidato'?'var(--accent)':'var(--bg)'};color:${m.remetente_tipo==='candidato'?'#fff':'var(--text)'};border-radius:${m.remetente_tipo==='candidato'?'10px 10px 4px 10px':'4px 10px 10px 10px'};padding:8px 12px;font-size:12px;line-height:1.5">
+            ${m.conteudo}
+            <div style="font-size:9px;opacity:.6;margin-top:3px;text-align:right">${new Date(m.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})}</div>
+          </div>
+        </div>`).join('');
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+    loadMensagensPortal(); // atualiza badges
+  } catch(e) {
+    document.getElementById('portal-msgs').innerHTML = `<div style="padding:1rem;color:var(--danger);font-size:12px">Erro: ${e.message}</div>`;
+  }
+}
+
+async function enviarRespostaPortal(candidaturaId) {
+  var inp = document.getElementById('portal-reply-input');
+  var msg = inp?.value?.trim();
+  if (!msg || !currentCandidato) return;
+  inp.value = '';
+  try {
+    var { error } = await sb.from('mensagens').insert({
+      candidatura_id: candidaturaId,
+      remetente_tipo: 'candidato',
+      remetente_id: currentCandidato.id,
+      conteudo: msg,
+      lida: false
+    });
+    if (error) throw error;
+    var vagaTitle = document.querySelector('#portal-chat-panel .font-600')?.textContent?.replace('RH — ','') || '—';
+    abrirChatPortal(candidaturaId, vagaTitle);
+  } catch(e) { toast('Erro: '+e.message, 'error'); }
 }
 
 // ============================================================
