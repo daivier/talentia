@@ -447,7 +447,10 @@ button{cursor:pointer;}
     <div class="view" id="v-emails">
       <div class="page-hd">
         <div><div class="page-title">E-mails automáticos</div><div class="page-sub">Templates salvos no banco · Gatilhos automáticos</div></div>
-        <div class="page-actions"><button class="btn btn-primary btn-sm" onclick="openModal('m-email-template')"><i class="ti ti-plus"></i> Novo template</button></div>
+        <div class="page-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openModal('m-testar-email')"><i class="ti ti-send"></i> Testar envio</button>
+          <button class="btn btn-primary btn-sm" onclick="openModal('m-email-template')"><i class="ti ti-plus"></i> Novo template</button>
+        </div>
       </div>
       <div class="g2" style="align-items:start">
         <div><div id="email-templates-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando templates...</div></div></div>
@@ -550,6 +553,43 @@ button{cursor:pointer;}
       <div class="loading"><i class="ti ti-loader-2"></i> Carregando...</div>
     </div>
     <div class="modal-foot" id="m-candidato-foot"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-testar-email">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-hd"><div class="modal-title">Testar envio de e-mail</div><button class="modal-close" onclick="closeModal('m-testar-email')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <div style="background:var(--accent-l);border-radius:var(--r-sm);padding:10px 12px;font-size:12px;color:var(--accent-d);margin-bottom:14px;line-height:1.5">
+        <i class="ti ti-info-circle" style="font-size:14px;vertical-align:-2px"></i>
+        Envia um e-mail de teste para verificar se o SMTP está configurado corretamente no Railway.
+      </div>
+      <div class="form-group"><label class="form-label-sm">Enviar e-mail de teste para</label><input class="f-input" id="test-email-to" type="email" placeholder="seu@email.com"></div>
+      <div id="test-email-result" style="display:none;padding:10px;border-radius:var(--r-sm);font-size:12px;margin-top:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-testar-email')">Fechar</button>
+      <button class="btn btn-primary btn-sm" onclick="testarEmail()"><i class="ti ti-send"></i> Enviar teste</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="m-disparar-email">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-hd"><div class="modal-title">Disparar e-mail</div><button class="modal-close" onclick="closeModal('m-disparar-email')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label-sm">Template</label><select class="f-input" id="disp-template"></select></div>
+      <div class="form-group"><label class="form-label-sm">Destinatário</label><input class="f-input" id="disp-to" type="email" placeholder="candidato@email.com"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="form-group"><label class="form-label-sm">Nome do candidato</label><input class="f-input" id="disp-nome" placeholder="João Silva"></div>
+        <div class="form-group"><label class="form-label-sm">Cargo</label><input class="f-input" id="disp-cargo" placeholder="Eng. Backend"></div>
+      </div>
+      <div id="disp-result" style="display:none;padding:10px;border-radius:var(--r-sm);font-size:12px;margin-top:8px"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-disparar-email')">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="dispararEmail()"><i class="ti ti-send"></i> Enviar e-mail</button>
+    </div>
   </div>
 </div>
 
@@ -1723,7 +1763,96 @@ async function enviarNovaMensagem() {
 // ============================================================
 // EMAIL TEMPLATES
 // ============================================================
-async function loadEmailTemplates() {
+async function testarEmail() {
+  var to = document.getElementById('test-email-to').value.trim();
+  if (!to) { toast('Informe o e-mail de destino','error'); return; }
+  var result = document.getElementById('test-email-result');
+  result.style.display = 'block';
+  result.style.background = 'var(--warn-l)';
+  result.style.color = 'var(--warn)';
+  result.textContent = 'Enviando...';
+  try {
+    var r = await fetch('/api/email/test', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to})
+    });
+    var d = await r.json();
+    if (d.success) {
+      result.style.background = 'var(--success-l)';
+      result.style.color = 'var(--success)';
+      result.textContent = '✓ E-mail enviado com sucesso! Verifique sua caixa de entrada.';
+    } else {
+      throw new Error(d.error);
+    }
+  } catch(e) {
+    result.style.background = 'var(--danger-l)';
+    result.style.color = 'var(--danger)';
+    result.textContent = '✗ Erro: ' + e.message + '. Verifique as variáveis SMTP no Railway.';
+  }
+}
+
+async function abrirDispararEmail(tplId) {
+  openModal('m-disparar-email');
+  document.getElementById('disp-result').style.display = 'none';
+  if (!demoMode) {
+    var { data } = await sb.from('email_templates').select('id,gatilho,assunto').eq('empresa_id', EMPRESA_ID);
+    var sel = document.getElementById('disp-template');
+    sel.innerHTML = (data||[]).map(t=>`<option value="${t.id}">${(t.gatilho||'').replace(/_/g,' ')} — ${t.assunto}</option>`).join('');
+    if (tplId) sel.value = tplId;
+  }
+}
+
+async function dispararEmail() {
+  var to = document.getElementById('disp-to').value.trim();
+  var tplId = document.getElementById('disp-template').value;
+  var nome = document.getElementById('disp-nome').value.trim();
+  var cargo = document.getElementById('disp-cargo').value.trim();
+  if (!to || !tplId) { toast('Preencha destinatário e template','error'); return; }
+
+  var result = document.getElementById('disp-result');
+  result.style.display = 'block';
+  result.style.background = 'var(--warn-l)';
+  result.style.color = 'var(--warn)';
+  result.textContent = 'Enviando...';
+
+  try {
+    var { data: tpl } = await sb.from('email_templates').select('*').eq('id', tplId).single();
+    if (!tpl) throw new Error('Template não encontrado');
+    var vars = { nome, cargo, empresa: 'TalentAI', recrutador: document.getElementById('sb-name')?.textContent || 'RH', link_portal: window.location.origin + '/portal' };
+    var r = await fetch('/api/email', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to, subject: tpl.assunto, content: tpl.corpo, vars})
+    });
+    var d = await r.json();
+    if (d.success) {
+      result.style.background = 'var(--success-l)';
+      result.style.color = 'var(--success)';
+      result.textContent = '✓ E-mail enviado para ' + to;
+    } else throw new Error(d.error);
+  } catch(e) {
+    result.style.background = 'var(--danger-l)';
+    result.style.color = 'var(--danger)';
+    result.textContent = '✗ Erro: ' + e.message;
+  }
+}
+
+async function enviarEmailAutomatico(gatilho, candidatoEmail, vars) {
+  // Chamado automaticamente pelo sistema em eventos como avançar etapa
+  if (demoMode || window.location.protocol === 'file:') return;
+  try {
+    var { data: tpls } = await sb.from('email_templates').select('*').eq('empresa_id', EMPRESA_ID).eq('gatilho', gatilho).eq('ativo', true);
+    if (!tpls || !tpls.length) return;
+    var tpl = tpls[0];
+    await fetch('/api/email', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to: candidatoEmail, subject: tpl.assunto, content: tpl.corpo, vars})
+    });
+    console.log('E-mail automático enviado:', gatilho, candidatoEmail);
+  } catch(e) { console.warn('Erro e-mail automático:', e.message); }
+}
   var el = document.getElementById('email-templates-list');
   if (demoMode) {
     renderEmailTemplates(DEMO.templates);
@@ -1739,8 +1868,13 @@ function renderEmailTemplates(list) {
   document.getElementById('email-templates-list').innerHTML = !list.length ?
     '<div class="empty-state"><i class="ti ti-mail"></i>Nenhum template</div>' :
     list.map(t=>`
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:8px;cursor:pointer" onclick="loadTemplateEditor('${t.id}')">
-        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint);margin-bottom:4px">${t.gatilho.replace(/_/g,' ')}</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint)">${(t.gatilho||'').replace(/_/g,' ')}</div>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirDispararEmail('${t.id}')" title="Disparar e-mail">
+            <i class="ti ti-send" style="font-size:11px"></i> Disparar
+          </button>
+        </div>
         <div style="font-size:13px;font-weight:500;margin-bottom:3px">${t.assunto}</div>
         <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.corpo}</div>
       </div>`).join('');
