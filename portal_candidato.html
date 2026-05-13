@@ -458,6 +458,11 @@ function showSetupStatus(msg, type) {
 function initApp() {
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  // Garante campo de busca limpo
+  setTimeout(() => {
+    var inp = document.getElementById('search-input');
+    if (inp) inp.value = '';
+  }, 200);
   loadJobs();
   loadStats();
   checkSession();
@@ -1107,6 +1112,12 @@ function formatDateShort(d) {
 // INIT
 // ============================================================
 window.onload = function() {
+  // Limpa campo de busca ao carregar (evita autocomplete do navegador)
+  setTimeout(() => {
+    var inp = document.getElementById('search-input');
+    if (inp) { inp.value = ''; }
+  }, 100);
+
   var url = localStorage.getItem('portal_sb_url');
   var key = localStorage.getItem('portal_sb_key');
   if (url && key) {
