@@ -1853,6 +1853,8 @@ async function enviarEmailAutomatico(gatilho, candidatoEmail, vars) {
     console.log('E-mail automático enviado:', gatilho, candidatoEmail);
   } catch(e) { console.warn('Erro e-mail automático:', e.message); }
 }
+
+async function loadEmailTemplates() {
   var el = document.getElementById('email-templates-list');
   if (demoMode) {
     renderEmailTemplates(DEMO.templates);
