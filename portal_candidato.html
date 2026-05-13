@@ -859,9 +859,29 @@ function renderApplyStep() {
 function handleCvUpload(input) {
   if (input.files && input.files[0]) {
     cvFile = input.files[0];
-    document.getElementById('cv-name').textContent = cvFile.name;
+    document.getElementById('cv-name').textContent = cvFile.name + ' (' + (cvFile.size/1024).toFixed(0) + ' KB)';
     document.getElementById('cv-preview').style.display = 'flex';
     document.getElementById('cv-zone').style.borderColor = 'var(--success)';
+  }
+}
+
+async function uploadCurriculo(candidatoId) {
+  if (!cvFile || !sb) return null;
+  try {
+    var ext = cvFile.name.split('.').pop();
+    var fileName = candidatoId + '_' + Date.now() + '.' + ext;
+    var { data, error } = await sb.storage.from('curriculos').upload(fileName, cvFile, {
+      contentType: cvFile.type || 'application/octet-stream',
+      upsert: true
+    });
+    if (error) throw error;
+    console.log('Currículo enviado:', fileName);
+    // Atualiza cv_url no candidato
+    await sb.from('candidatos').update({ cv_url: fileName }).eq('id', candidatoId);
+    return fileName;
+  } catch(e) {
+    console.warn('Erro upload currículo:', e.message);
+    return null;
   }
 }
 
@@ -895,7 +915,12 @@ async function submitApply() {
 
     appliedIds.push(applyJob.id);
 
-    // 2. Calcula score IA em background (não bloqueia o fluxo)
+    // 2. Upload do currículo em background
+    if (cvFile) {
+      uploadCurriculo(currentCandidato.id).catch(e => console.warn('Upload CV:', e.message));
+    }
+
+    // 3. Calcula score IA em background (não bloqueia o fluxo)
     calcularScorePortal(candidatura.id, currentCandidato, applyJob).catch(e => {
       console.warn('Score IA não calculado:', e.message);
     });

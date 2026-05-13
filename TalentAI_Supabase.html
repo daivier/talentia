@@ -1060,6 +1060,14 @@ async function loadCandidatos() {
   if (demoMode) { candsCache = DEMO.candidaturas; renderCandidatos(candsCache); return; }
   try {
     var { data, error, count } = await sb.from('v_pipeline').select('*',{count:'exact'}).order('score_ia',{ascending:false});
+    // Enriquecer com cv_url dos candidatos
+    if (data && data.length) {
+      var ids = [...new Set(data.map(c=>c.candidato_id).filter(Boolean))];
+      var {data:cvData} = await sb.from('candidatos').select('id,cv_url').in('id',ids);
+      var cvMap = {};
+      (cvData||[]).forEach(c => cvMap[c.id] = c.cv_url);
+      data = data.map(c => ({...c, cv_url: cvMap[c.candidato_id]||null}));
+    }
     if (error) throw error;
     candsCache = data || [];
     document.getElementById('cands-sub').textContent = `${count||0} candidatos`;
@@ -1190,6 +1198,8 @@ async function openCandidatoDetail(candidatoId, candidaturaId) {
       </div>`;
 
     foot.innerHTML = `
+      <button class="btn btn-danger btn-sm" onclick="deletarCandidato('${candidatoId}')"><i class="ti ti-trash"></i></button>
+      ${c.cv_url ? `<button class="btn btn-ghost btn-sm" onclick="downloadCurriculo('${c.cv_url}','${c.nome}')"><i class="ti ti-download"></i> CV</button>` : ''}
       <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato')">Fechar</button>
       ${candidaturaId ? `
         <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-mensagens');abrirChatCandidato('${candidaturaId}','${c.nome}')"><i class="ti ti-message"></i> Mensagem</button>
@@ -1763,6 +1773,62 @@ async function enviarNovaMensagem() {
 // ============================================================
 // EMAIL TEMPLATES
 // ============================================================
+async function deletarCandidato(candidatoId) {
+  if (!confirm('Excluir este candidato permanentemente? Todas as candidaturas, mensagens e dados serão removidos.')) return;
+  if (demoMode) {
+    candsCache = candsCache.filter(c => c.candidato_id !== candidatoId);
+    closeModal('m-candidato');
+    loadCandidatos();
+    toast('Candidato excluído (demo)', 'success');
+    return;
+  }
+  try {
+    // Deleta candidaturas primeiro (FK)
+    await sb.from('candidaturas').delete().eq('candidato_id', candidatoId);
+    // Deleta candidato
+    var { error } = await sb.from('candidatos').delete().eq('id', candidatoId);
+    if (error) throw error;
+    closeModal('m-candidato');
+    toast('Candidato excluído com sucesso', 'success');
+    loadCandidatos();
+    loadDashboard();
+  } catch(e) { toast('Erro: ' + e.message, 'error'); }
+}
+
+async function downloadCurriculo(cvUrl, nome) {
+  if (!cvUrl) { toast('Nenhum currículo disponível', 'error'); return; }
+  try {
+    var { data, error } = await sb.storage.from('curriculos').download(cvUrl);
+    if (error) throw error;
+    var ext = cvUrl.split('.').pop();
+    var url = URL.createObjectURL(data);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'curriculo_' + nome.replace(/\s+/g,'_') + '.' + ext;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Download iniciado!', 'success');
+  } catch(e) { toast('Erro ao baixar: ' + e.message, 'error'); }
+}
+
+async function deletarEmailTemplate(id) {
+  if (!confirm('Excluir este template de e-mail?')) return;
+  if (demoMode) {
+    DEMO.templates = DEMO.templates.filter(t => t.id !== id);
+    loadEmailTemplates();
+    toast('Template excluído (demo)', 'success');
+    return;
+  }
+  try {
+    var { error } = await sb.from('email_templates').delete().eq('id', id);
+    if (error) throw error;
+    toast('Template excluído!', 'success');
+    loadEmailTemplates();
+  } catch(e) { toast('Erro: ' + e.message, 'error'); }
+}
+
 async function testarEmail() {
   var to = document.getElementById('test-email-to').value.trim();
   if (!to) { toast('Informe o e-mail de destino','error'); return; }
@@ -1873,9 +1939,14 @@ function renderEmailTemplates(list) {
       <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:8px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint)">${(t.gatilho||'').replace(/_/g,' ')}</div>
-          <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirDispararEmail('${t.id}')" title="Disparar e-mail">
-            <i class="ti ti-send" style="font-size:11px"></i> Disparar
-          </button>
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirDispararEmail('${t.id}')">
+              <i class="ti ti-send" style="font-size:11px"></i> Disparar
+            </button>
+            <button class="btn btn-danger btn-sm" style="font-size:10px;padding:2px 6px" onclick="deletarEmailTemplate('${t.id}')">
+              <i class="ti ti-trash" style="font-size:11px"></i>
+            </button>
+          </div>
         </div>
         <div style="font-size:13px;font-weight:500;margin-bottom:3px">${t.assunto}</div>
         <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.corpo}</div>
