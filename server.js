@@ -241,11 +241,17 @@ const server = http.createServer((req, res) => {
   // ── Arquivos estáticos ────────────────────────────────
   var filePath;
   if (pathname === '/' || pathname === '/index.html') {
-    filePath = path.join(__dirname, 'TalentAI_Supabase.html');
+      // Se vier do subdomínio vagas, serve o portal
+      var host = req.headers.host || '';
+      if (host.includes('vagas.')) {
+          filePath = path.join(__dirname, 'portal_candidato.html');
+      } else {
+          filePath = path.join(__dirname, 'TalentAI_Supabase.html');
+      }
   } else if (pathname === '/portal' || pathname === '/portal/') {
-    filePath = path.join(__dirname, 'portal_candidato.html');
+      filePath = path.join(__dirname, 'portal_candidato.html');
   } else {
-    filePath = path.join(__dirname, pathname);
+      filePath = path.join(__dirname, pathname);
   }
 
   fs.readFile(filePath, (err, data) => {
