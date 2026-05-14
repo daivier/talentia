@@ -643,7 +643,11 @@ button{cursor:pointer;}
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="form-group"><label class="form-label-sm">Contrato *</label><select class="f-input" id="nv-contrato"><option value="clt">CLT</option><option value="pj">PJ</option><option value="estagio">Estágio</option></select></div>
-        <div class="form-group"><label class="form-label-sm">Salário máx</label><input class="f-input" id="nv-salario" type="number" placeholder="Ex: 20000"></div>
+        <div class="form-group"><label class="form-label-sm">Salário mín.</label><input class="f-input" id="nv-salario-min" type="number" placeholder="Ex: 8000"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div></div>
+        <div class="form-group"><label class="form-label-sm">Salário máx.</label><input class="f-input" id="nv-salario" type="number" placeholder="Ex: 20000"></div>
       </div>
       <div class="form-group"><label class="form-label-sm">Descrição</label><textarea class="f-input" id="nv-descricao" rows="4" placeholder="Descreva a vaga..."></textarea></div>
       <div class="form-group"><label class="form-label-sm">Tags (separadas por vírgula)</label><input class="f-input" id="nv-tags" placeholder="Ex: Java, Kafka, AWS"></div>
@@ -1050,7 +1054,7 @@ var editingVagaId = null;
 function novaVaga() {
   editingVagaId = null;
   document.getElementById('nv-modal-title').textContent = 'Nova vaga';
-  ['nv-titulo','nv-area','nv-salario','nv-descricao','nv-tags'].forEach(id => document.getElementById(id).value = '');
+  ['nv-titulo','nv-area','nv-salario-min','nv-salario','nv-descricao','nv-tags'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('nv-modalidade').value = 'remoto';
   document.getElementById('nv-contrato').value = 'clt';
   openModal('m-nova-vaga');
@@ -1061,7 +1065,7 @@ async function saveVaga() {
   var area = document.getElementById('nv-area').value.trim();
   if (!titulo || !area) { toast('Preencha os campos obrigatórios','error'); return; }
   var tags = document.getElementById('nv-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
-  var payload = {titulo,area,modalidade:document.getElementById('nv-modalidade').value,tipo_contrato:document.getElementById('nv-contrato').value,salario_max:Number(document.getElementById('nv-salario').value)||null,descricao:document.getElementById('nv-descricao').value,tags};
+  var payload = {titulo,area,modalidade:document.getElementById('nv-modalidade').value,tipo_contrato:document.getElementById('nv-contrato').value,salario_min:Number(document.getElementById('nv-salario-min').value)||null,salario_max:Number(document.getElementById('nv-salario').value)||null,descricao:document.getElementById('nv-descricao').value,tags};
   if (demoMode) {
     if (editingVagaId) {
       var idx = DEMO.vagas.findIndex(v=>v.id===editingVagaId);
@@ -1100,6 +1104,7 @@ function editVaga(id) {
   document.getElementById('nv-area').value = v.area || '';
   document.getElementById('nv-modalidade').value = v.modalidade || 'remoto';
   document.getElementById('nv-contrato').value = v.tipo_contrato || 'clt';
+  document.getElementById('nv-salario-min').value = v.salario_min || '';
   document.getElementById('nv-salario').value = v.salario_max || '';
   document.getElementById('nv-descricao').value = v.descricao || '';
   document.getElementById('nv-tags').value = (v.tags||[]).join(', ');
