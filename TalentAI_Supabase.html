@@ -627,6 +627,7 @@ button{cursor:pointer;}
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('m-detalhe-vaga')">Fechar</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="closeModal('m-detalhe-vaga');deleteVaga(currentVagaId)"><i class="ti ti-trash"></i> Excluir</button>
       <button class="btn btn-primary btn-sm" onclick="editVaga(currentVagaId)"><i class="ti ti-pencil"></i> Editar vaga</button>
     </div>
   </div>
