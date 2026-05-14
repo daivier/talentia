@@ -1012,6 +1012,9 @@ function renderVagas(list) {
       <td style="color:var(--muted);font-size:12px">${formatDate(v.created_at)}</td>
       <td>
         <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" title="Ver detalhes" onclick="openVagaDetail('${v.id}')">
+            <i class="ti ti-eye" style="font-size:13px"></i>
+          </button>
           ${v.status==='ativa' ? `
             <button class="btn btn-ghost btn-sm" title="Pausar vaga" onclick="alterarStatusVaga('${v.id}','pausada')">
               <i class="ti ti-player-pause" style="font-size:13px"></i>
@@ -1030,9 +1033,6 @@ function renderVagas(list) {
             <button class="btn btn-ghost btn-sm" title="Reativar vaga" onclick="alterarStatusVaga('${v.id}','ativa')" style="color:var(--success)">
               <i class="ti ti-player-play" style="font-size:13px"></i>
             </button>` : ''}
-          <button class="btn btn-ghost btn-sm" title="Ver detalhes" onclick="openVagaDetail('${v.id}')">
-            <i class="ti ti-eye" style="font-size:13px"></i>
-          </button>
         </div>
       </td>
     </tr>`).join('')+'</tbody></table>';
