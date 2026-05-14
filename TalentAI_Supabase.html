@@ -261,7 +261,7 @@ button{cursor:pointer;}
           <i class="ti ti-database" style="font-size:13px"></i>
           <span id="db-pill-text">Supabase conectado</span>
         </div>
-        <button class="btn btn-primary btn-sm" onclick="openModal('m-nova-vaga')"><i class="ti ti-plus"></i> Nova vaga</button>
+        <button class="btn btn-primary btn-sm" onclick="novaVaga()"><i class="ti ti-plus"></i> Nova vaga</button>
       </div>
     </div>
 
@@ -300,7 +300,7 @@ button{cursor:pointer;}
         <div><div class="page-title">Vagas</div><div class="page-sub" id="vagas-sub"></div></div>
         <div class="page-actions">
           <button class="btn btn-ghost btn-sm" onclick="loadVagas()"><i class="ti ti-refresh"></i></button>
-          <button class="btn btn-primary btn-sm" onclick="openModal('m-nova-vaga')"><i class="ti ti-plus"></i> Nova vaga</button>
+          <button class="btn btn-primary btn-sm" onclick="novaVaga()"><i class="ti ti-plus"></i> Nova vaga</button>
         </div>
       </div>
       <div class="search-row">
@@ -627,13 +627,14 @@ button{cursor:pointer;}
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('m-detalhe-vaga')">Fechar</button>
+      <button class="btn btn-primary btn-sm" onclick="editVaga(currentVagaId)"><i class="ti ti-pencil"></i> Editar vaga</button>
     </div>
   </div>
 </div>
 
 <div class="modal-overlay" id="m-nova-vaga">
   <div class="modal-box">
-    <div class="modal-hd"><div class="modal-title">Nova vaga</div><button class="modal-close" onclick="closeModal('m-nova-vaga')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-hd"><div class="modal-title" id="nv-modal-title">Nova vaga</div><button class="modal-close" onclick="closeModal('m-nova-vaga')"><i class="ti ti-x"></i></button></div>
     <div class="modal-body">
       <div class="form-group"><label class="form-label-sm">Cargo *</label><input class="f-input" id="nv-titulo" placeholder="Ex: Engenheiro de Software Sênior"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -1044,21 +1045,66 @@ function filterVagas() {
   renderVagas(vagasCache.filter(v => (!q||v.titulo.toLowerCase().includes(q)||v.area.toLowerCase().includes(q)) && (!st||v.status===st)));
 }
 
+var editingVagaId = null;
+
+function novaVaga() {
+  editingVagaId = null;
+  document.getElementById('nv-modal-title').textContent = 'Nova vaga';
+  ['nv-titulo','nv-area','nv-salario','nv-descricao','nv-tags'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('nv-modalidade').value = 'remoto';
+  document.getElementById('nv-contrato').value = 'clt';
+  openModal('m-nova-vaga');
+}
+
 async function saveVaga() {
   var titulo = document.getElementById('nv-titulo').value.trim();
   var area = document.getElementById('nv-area').value.trim();
   if (!titulo || !area) { toast('Preencha os campos obrigatórios','error'); return; }
   var tags = document.getElementById('nv-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
-  var payload = {empresa_id:EMPRESA_ID,titulo,area,modalidade:document.getElementById('nv-modalidade').value,tipo_contrato:document.getElementById('nv-contrato').value,salario_max:Number(document.getElementById('nv-salario').value)||null,descricao:document.getElementById('nv-descricao').value,tags,status:'ativa'};
-  if (demoMode) { DEMO.vagas.unshift({...payload,id:Date.now().toString(),created_at:new Date().toISOString()}); closeModal('m-nova-vaga'); loadVagas(); toast('Vaga criada (modo demo)','success'); return; }
+  var payload = {titulo,area,modalidade:document.getElementById('nv-modalidade').value,tipo_contrato:document.getElementById('nv-contrato').value,salario_max:Number(document.getElementById('nv-salario').value)||null,descricao:document.getElementById('nv-descricao').value,tags};
+  if (demoMode) {
+    if (editingVagaId) {
+      var idx = DEMO.vagas.findIndex(v=>v.id===editingVagaId);
+      if (idx>=0) DEMO.vagas[idx] = {...DEMO.vagas[idx],...payload};
+      toast('Vaga atualizada (modo demo)','success');
+    } else {
+      DEMO.vagas.unshift({...payload,empresa_id:EMPRESA_ID,id:Date.now().toString(),created_at:new Date().toISOString(),status:'ativa'});
+      toast('Vaga criada (modo demo)','success');
+    }
+    closeModal('m-nova-vaga'); loadVagas(); editingVagaId=null; return;
+  }
   try {
-    var { error } = await sb.from('vagas').insert(payload);
-    if (error) throw error;
+    var error;
+    if (editingVagaId) {
+      ({error} = await sb.from('vagas').update(payload).eq('id',editingVagaId));
+      if (error) throw error;
+      toast('Vaga atualizada!','success');
+    } else {
+      ({error} = await sb.from('vagas').insert({...payload,empresa_id:EMPRESA_ID,status:'ativa'}));
+      if (error) throw error;
+      toast('Vaga criada no banco!','success');
+    }
+    editingVagaId = null;
     closeModal('m-nova-vaga');
-    toast('Vaga criada no banco!','success');
     loadVagas();
     loadDashboard();
   } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+function editVaga(id) {
+  var v = vagasCache.find(v=>v.id===id);
+  if (!v) return;
+  editingVagaId = id;
+  document.getElementById('nv-modal-title').textContent = 'Editar vaga';
+  document.getElementById('nv-titulo').value = v.titulo || '';
+  document.getElementById('nv-area').value = v.area || '';
+  document.getElementById('nv-modalidade').value = v.modalidade || 'remoto';
+  document.getElementById('nv-contrato').value = v.tipo_contrato || 'clt';
+  document.getElementById('nv-salario').value = v.salario_max || '';
+  document.getElementById('nv-descricao').value = v.descricao || '';
+  document.getElementById('nv-tags').value = (v.tags||[]).join(', ');
+  closeModal('m-detalhe-vaga');
+  openModal('m-nova-vaga');
 }
 
 async function alterarStatusVaga(id, novoStatus) {
@@ -1091,9 +1137,12 @@ async function deleteVaga(id) {
   } catch(e) { toast('Erro: '+e.message,'error'); }
 }
 
+var currentVagaId = null;
+
 function openVagaDetail(id) {
   var v = vagasCache.find(v => v.id === id);
   if (!v) return;
+  currentVagaId = id;
   document.getElementById('dv-titulo-hd').textContent = v.titulo;
   document.getElementById('dv-area').textContent = v.area || '—';
   document.getElementById('dv-modalidade').textContent = v.modalidade || '—';
