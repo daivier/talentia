@@ -340,6 +340,7 @@ button{cursor:pointer;}
         <div><div class="page-title">Pipeline</div><div class="page-sub">Visão por etapa de seleção</div></div>
         <div class="page-actions">
           <select class="btn btn-ghost btn-sm" id="pipeline-vaga-filter" onchange="loadPipeline()" style="border-radius:var(--r-md);font-size:12px"></select>
+          <button class="btn btn-primary btn-sm" onclick="triagemAutomatica()" title="Analisa inscritos sem score e avança os aprovados para Triagem IA"><i class="ti ti-sparkles"></i> Triagem IA</button>
           <button class="btn btn-ghost btn-sm" onclick="loadPipeline()"><i class="ti ti-refresh"></i></button>
         </div>
       </div>
@@ -1389,7 +1390,16 @@ O score deve ser um número de 0 a 100. A análise deve ter 3-4 linhas explicand
     var analise = result.analise || '';
 
     // Salva no banco
+    var { data: candAtual } = await sb.from('candidaturas').select('etapa').eq('id', candidaturaId).single();
     await sb.from('candidaturas').update({score_ia: score, analise_ia: analise}).eq('id', candidaturaId);
+
+    // Triagem automática: avança para triagem_ia se score >= 70 e ainda está inscrito
+    if (candAtual?.etapa === 'inscrito') {
+      var novaEtapa = score >= 70 ? 'triagem_ia' : 'reprovado';
+      await sb.from('candidaturas').update({etapa: novaEtapa}).eq('id', candidaturaId);
+      if (novaEtapa === 'triagem_ia') toast(`Score ${score}% — avançado para Triagem IA ✓`, 'success');
+      else toast(`Score ${score}% — candidato reprovado na triagem`, 'warn');
+    }
 
     // Atualiza UI
     document.getElementById('score-display').textContent = score + '%';
@@ -1420,9 +1430,24 @@ async function calcularTodosScores() {
     if (!data || !data.length) { toast('Todos os candidatos já têm score!'); return; }
     for (var cand of data) {
       await calcularScore(cand.id, cand.candidato_id);
-      await new Promise(r => setTimeout(r, 500)); // evitar rate limit
+      await new Promise(r => setTimeout(r, 500));
     }
     toast('Scores calculados!', 'success');
+  } catch(e) { toast('Erro: '+e.message, 'error'); }
+}
+
+async function triagemAutomatica() {
+  if (!confirm('A IA vai analisar todos os candidatos inscritos sem score e avançar automaticamente os com score ≥ 70 para Triagem IA. Candidatos abaixo de 70 serão reprovados. Continuar?')) return;
+  try {
+    var { data } = await sb.from('candidaturas').select('id, candidato_id').eq('etapa', 'inscrito').is('score_ia', null);
+    if (!data || !data.length) { toast('Nenhum inscrito sem score para avaliar.', 'warn'); loadPipeline(); return; }
+    toast(`Analisando ${data.length} candidato(s)...`);
+    for (var cand of data) {
+      await calcularScore(cand.id, cand.candidato_id);
+      await new Promise(r => setTimeout(r, 600));
+    }
+    toast('Triagem concluída!', 'success');
+    loadPipeline();
   } catch(e) { toast('Erro: '+e.message, 'error'); }
 }
 
