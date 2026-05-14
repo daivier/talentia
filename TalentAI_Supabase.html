@@ -593,6 +593,44 @@ button{cursor:pointer;}
   </div>
 </div>
 
+<div class="modal-overlay" id="m-detalhe-vaga">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-hd"><div class="modal-title" id="dv-titulo-hd">Detalhes da vaga</div><button class="modal-close" onclick="closeModal('m-detalhe-vaga')"><i class="ti ti-x"></i></button></div>
+    <div class="modal-body" style="gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Área</div><span class="tag tag-gray" id="dv-area"></span></div>
+        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Modalidade</div><span class="tag tag-blue" id="dv-modalidade"></span></div>
+        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Contrato</div><span class="tag tag-gray" id="dv-contrato"></span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Salário mín.</div><div style="font-weight:500;color:var(--success)" id="dv-sal-min"></div></div>
+        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Salário máx.</div><div style="font-weight:500;color:var(--success)" id="dv-sal-max"></div></div>
+        <div><div style="font-size:11px;color:var(--muted);margin-bottom:3px">Status</div><span id="dv-status"></span></div>
+      </div>
+      <div id="dv-descricao-wrap">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Descrição</div>
+        <div id="dv-descricao" style="font-size:13px;line-height:1.6;white-space:pre-wrap;background:var(--bg2);padding:10px;border-radius:var(--r-sm)"></div>
+      </div>
+      <div id="dv-tags-wrap">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Tags</div>
+        <div id="dv-tags" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+      </div>
+      <div id="dv-requisitos-wrap">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Requisitos</div>
+        <ul id="dv-requisitos" style="margin:0;padding-left:18px;font-size:13px;line-height:1.8"></ul>
+      </div>
+      <div id="dv-diferenciais-wrap">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Diferenciais</div>
+        <ul id="dv-diferenciais" style="margin:0;padding-left:18px;font-size:13px;line-height:1.8"></ul>
+      </div>
+      <div style="font-size:11px;color:var(--muted)" id="dv-datas"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('m-detalhe-vaga')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="m-nova-vaga">
   <div class="modal-box">
     <div class="modal-hd"><div class="modal-title">Nova vaga</div><button class="modal-close" onclick="closeModal('m-nova-vaga')"><i class="ti ti-x"></i></button></div>
@@ -989,6 +1027,9 @@ function renderVagas(list) {
             <button class="btn btn-ghost btn-sm" title="Reativar vaga" onclick="alterarStatusVaga('${v.id}','ativa')" style="color:var(--success)">
               <i class="ti ti-player-play" style="font-size:13px"></i>
             </button>` : ''}
+          <button class="btn btn-ghost btn-sm" title="Ver detalhes" onclick="openVagaDetail('${v.id}')">
+            <i class="ti ti-eye" style="font-size:13px"></i>
+          </button>
           <button class="btn btn-ghost btn-sm" title="Excluir vaga" onclick="deleteVaga('${v.id}')">
             <i class="ti ti-trash" style="font-size:13px"></i>
           </button>
@@ -1048,6 +1089,37 @@ async function deleteVaga(id) {
     toast('Vaga excluída','success');
     loadVagas();
   } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+function openVagaDetail(id) {
+  var v = vagasCache.find(v => v.id === id);
+  if (!v) return;
+  document.getElementById('dv-titulo-hd').textContent = v.titulo;
+  document.getElementById('dv-area').textContent = v.area || '—';
+  document.getElementById('dv-modalidade').textContent = v.modalidade || '—';
+  document.getElementById('dv-contrato').textContent = v.tipo_contrato ? v.tipo_contrato.toUpperCase() : '—';
+  document.getElementById('dv-sal-min').textContent = v.salario_min ? 'R$ ' + Number(v.salario_min).toLocaleString('pt-BR') : '—';
+  document.getElementById('dv-sal-max').textContent = v.salario_max ? 'R$ ' + Number(v.salario_max).toLocaleString('pt-BR') : '—';
+  var statusColor = v.status === 'ativa' ? 'green' : v.status === 'pausada' ? 'warn' : 'red';
+  document.getElementById('dv-status').innerHTML = `<span class="tag tag-${statusColor}">${v.status}</span>`;
+  var desc = document.getElementById('dv-descricao-wrap');
+  if (v.descricao) { document.getElementById('dv-descricao').textContent = v.descricao; desc.style.display = ''; }
+  else { desc.style.display = 'none'; }
+  var tagsWrap = document.getElementById('dv-tags-wrap');
+  if (v.tags && v.tags.length) { document.getElementById('dv-tags').innerHTML = v.tags.map(t => `<span class="tag tag-blue">${t}</span>`).join(''); tagsWrap.style.display = ''; }
+  else { tagsWrap.style.display = 'none'; }
+  var reqWrap = document.getElementById('dv-requisitos-wrap');
+  if (v.requisitos && v.requisitos.length) { document.getElementById('dv-requisitos').innerHTML = v.requisitos.map(r => `<li>${r}</li>`).join(''); reqWrap.style.display = ''; }
+  else { reqWrap.style.display = 'none'; }
+  var difWrap = document.getElementById('dv-diferenciais-wrap');
+  if (v.diferenciais && v.diferenciais.length) { document.getElementById('dv-diferenciais').innerHTML = v.diferenciais.map(d => `<li>${d}</li>`).join(''); difWrap.style.display = ''; }
+  else { difWrap.style.display = 'none'; }
+  var datas = [];
+  if (v.created_at) datas.push('Criada em ' + formatDate(v.created_at));
+  if (v.publicada_em) datas.push('Publicada em ' + formatDate(v.publicada_em));
+  if (v.encerrada_em) datas.push('Encerrada em ' + formatDate(v.encerrada_em));
+  document.getElementById('dv-datas').textContent = datas.join(' · ');
+  openModal('m-detalhe-vaga');
 }
 
 // ============================================================
