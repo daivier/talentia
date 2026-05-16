@@ -1401,9 +1401,12 @@ O score deve ser um número de 0 a 100. A análise deve ter 3-4 linhas explicand
       else toast(`Score ${score}% — candidato reprovado na triagem`, 'warn');
     }
 
-    // Atualiza UI
-    document.getElementById('score-display').textContent = score + '%';
-    document.getElementById('score-display').style.color = score>=85?'var(--success)':score>=70?'var(--warn)':'var(--hint)';
+    // Atualiza UI (só se o modal estiver aberto)
+    var scoreDisplay = document.getElementById('score-display');
+    if (scoreDisplay) {
+      scoreDisplay.textContent = score + '%';
+      scoreDisplay.style.color = score>=85?'var(--success)':score>=70?'var(--warn)':'var(--hint)';
+    }
     if (btn) btn.remove();
 
     var analiseSection = document.getElementById('analise-section');
