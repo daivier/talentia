@@ -456,12 +456,15 @@ button{cursor:pointer;}
       <div class="g2" style="align-items:start">
         <div><div id="email-templates-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando templates...</div></div></div>
         <div class="card">
-          <div class="card-hd"><div class="card-title">Editor</div><div class="card-action" onclick="genEmailAI()">Gerar IA ✨</div></div>
+          <div class="card-hd"><div class="card-title" id="et-editor-title">Editor</div><div class="card-action" onclick="genEmailAI()">Gerar IA ✨</div></div>
           <div class="form-group"><label class="form-label-sm">Gatilho</label><select class="f-input" id="et-gatilho"><option value="candidatura_recebida">Candidatura recebida</option><option value="candidato_aprovado">Candidato aprovado</option><option value="feedback_reprovacao">Feedback reprovação</option><option value="convite_entrevista">Convite entrevista</option></select></div>
           <div class="form-group"><label class="form-label-sm">Assunto</label><input class="f-input" id="et-assunto" placeholder="Assunto do e-mail"></div>
           <div class="form-group"><label class="form-label-sm">Corpo</label><textarea class="f-input" id="et-corpo" rows="6" placeholder="Conteúdo do e-mail..."></textarea></div>
           <div id="et-ai-preview" style="display:none;background:var(--accent-l);border-radius:var(--r-sm);padding:10px;font-size:12px;color:var(--accent-d);margin-bottom:10px;line-height:1.6"></div>
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="saveEmailTemplate()"><i class="ti ti-device-floppy"></i> Salvar no banco</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="resetEditorTemplate()"><i class="ti ti-x"></i> Cancelar</button>
+            <button id="et-save-btn" class="btn btn-primary btn-sm" style="flex:1" onclick="saveEmailTemplate()"><i class="ti ti-device-floppy"></i> Salvar no banco</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2167,6 +2170,7 @@ async function loadEmailTemplates() {
 }
 
 function renderEmailTemplates(list) {
+  window._templatesCache = list;
   document.getElementById('email-templates-list').innerHTML = !list.length ?
     '<div class="empty-state"><i class="ti ti-mail"></i>Nenhum template</div>' :
     list.map(t=>`
@@ -2174,10 +2178,13 @@ function renderEmailTemplates(list) {
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--hint)">${(t.gatilho||'').replace(/_/g,' ')}</div>
           <div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="editarEmailTemplate('${t.id}')">
+              <i class="ti ti-pencil" style="font-size:11px"></i> Editar
+            </button>
             <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px" onclick="abrirDispararEmail('${t.id}')">
               <i class="ti ti-send" style="font-size:11px"></i> Disparar
             </button>
-            <button class="btn btn-danger btn-sm" style="font-size:10px;padding:2px 6px" onclick="deletarEmailTemplate('${t.id}')">
+            <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 6px;color:var(--danger)" onclick="deletarEmailTemplate('${t.id}')">
               <i class="ti ti-trash" style="font-size:11px"></i>
             </button>
           </div>
@@ -2187,6 +2194,20 @@ function renderEmailTemplates(list) {
       </div>`).join('');
 }
 
+var editingTemplateId = null;
+
+function editarEmailTemplate(id) {
+  var t = (window._templatesCache||[]).find(t=>t.id===id);
+  if (!t) return;
+  editingTemplateId = id;
+  document.getElementById('et-gatilho').value = t.gatilho || 'candidatura_recebida';
+  document.getElementById('et-assunto').value = t.assunto || '';
+  document.getElementById('et-corpo').value = t.corpo || '';
+  document.getElementById('et-editor-title').textContent = 'Editando template';
+  document.getElementById('et-save-btn').textContent = 'Salvar alterações';
+  document.getElementById('et-editor-title').style.color = 'var(--accent)';
+}
+
 function loadTemplateEditor(id) {
   toast('Clique em "Gerar IA" para criar um novo ou edite os campos à direita');
 }
@@ -2194,13 +2215,37 @@ function loadTemplateEditor(id) {
 async function saveEmailTemplate() {
   var payload = {empresa_id:EMPRESA_ID,gatilho:document.getElementById('et-gatilho').value,assunto:document.getElementById('et-assunto').value,corpo:document.getElementById('et-corpo').value};
   if (!payload.assunto || !payload.corpo) { toast('Preencha assunto e corpo','error'); return; }
-  if (demoMode) { DEMO.templates.push({...payload,id:Date.now().toString()}); loadEmailTemplates(); toast('Template salvo (demo)','success'); return; }
+  if (demoMode) {
+    if (editingTemplateId) {
+      var t = (window._templatesCache||[]).find(t=>t.id===editingTemplateId);
+      if (t) Object.assign(t, payload);
+    } else {
+      DEMO.templates.push({...payload,id:Date.now().toString()});
+    }
+    loadEmailTemplates(); resetEditorTemplate(); toast('Template salvo (demo)','success'); return;
+  }
   try {
-    var { error } = await sb.from('email_templates').insert(payload);
+    var error;
+    if (editingTemplateId) {
+      ({error} = await sb.from('email_templates').update(payload).eq('id', editingTemplateId));
+    } else {
+      ({error} = await sb.from('email_templates').insert(payload));
+    }
     if (error) throw error;
-    toast('Template salvo no banco!','success');
+    toast(editingTemplateId ? 'Template atualizado!' : 'Template salvo!', 'success');
+    resetEditorTemplate();
     loadEmailTemplates();
   } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+function resetEditorTemplate() {
+  editingTemplateId = null;
+  document.getElementById('et-assunto').value = '';
+  document.getElementById('et-corpo').value = '';
+  document.getElementById('et-gatilho').value = 'candidatura_recebida';
+  document.getElementById('et-editor-title').textContent = 'Editor';
+  document.getElementById('et-editor-title').style.color = '';
+  document.getElementById('et-save-btn').textContent = 'Salvar no banco';
 }
 
 async function saveEmailTemplateModal() {
