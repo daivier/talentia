@@ -1026,7 +1026,7 @@ async function loadMinhasApps() {
     return;
   }
   try {
-    var { data } = await sb.from('candidaturas').select(`*, vagas(titulo,modalidade,tipo_contrato,area)`).eq('candidato_id',currentCandidato.id).order('created_at',{ascending:false});
+    var { data } = await sb.from('candidaturas').select(`id,etapa,score_ia,analise_ia,created_at,vagas(titulo,modalidade,tipo_contrato,area)`).eq('candidato_id',currentCandidato.id).order('created_at',{ascending:false});
     var list = data||[];
     if (!list.length) {
       document.getElementById('my-apps-list').innerHTML = `
@@ -1058,7 +1058,10 @@ async function loadMinhasApps() {
         </div>
         <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
           <span>Etapa ${etapaIdx+1}/${etapas.length}: <strong>${etapaLabels[a.etapa]||a.etapa}</strong></span>
-          <span>${formatDateShort(a.created_at)}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            ${a.score_ia!=null?`<span style="font-weight:600;color:${a.score_ia>=85?'var(--success)':a.score_ia>=70?'#f59e0b':'var(--danger)'}">⚡ ${a.score_ia}% compatível</span>`:''}
+            <span>${formatDateShort(a.created_at)}</span>
+          </div>
         </div>
         ${a.etapa==='contratado'?`<div style="margin-top:8px;background:var(--success-l);padding:8px 12px;border-radius:var(--r-sm);font-size:12px;font-weight:500;color:var(--success);text-align:center">🎉 Parabéns! Você foi contratado!</div>`:''}
       </div>`;
