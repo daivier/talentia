@@ -686,7 +686,10 @@ function renderJobs(list) {
   }).join('');
 }
 
-function filterJobs() { renderJobs(getFilteredJobs()); }
+function filterJobs() {
+  if (document.querySelector('.modal-overlay.open')) return;
+  renderJobs(getFilteredJobs());
+}
 
 function setChip(el, val) {
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
