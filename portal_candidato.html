@@ -972,10 +972,12 @@ async function enviarEmailAutomaticoPortal(gatilho, email, vars) {
     var { data: tpls } = await sb.from('email_templates').select('*').eq('empresa_id', EMPRESA_ID).eq('gatilho', gatilho).eq('ativo', true);
     if (!tpls || !tpls.length) return;
     var tpl = tpls[0];
+    var portalVars = { empresa: 'TalentAI', recrutador: 'RH', link_portal: window.location.origin };
+    var allVars = Object.assign({}, portalVars, vars);
     await fetch('/api/email', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({to: email, subject: tpl.assunto, content: tpl.corpo, vars})
+      body: JSON.stringify({to: email, subject: tpl.assunto, content: tpl.corpo, vars: allVars})
     });
   } catch(e) { console.warn('Erro e-mail automático:', e.message); }
 }

@@ -149,6 +149,10 @@ const server = http.createServer((req, res) => {
         var finalSubject = vars ? renderTemplate(subject, vars) : subject;
         var finalContent = vars ? renderTemplate(content, vars) : content;
 
+        // Converte \n literal (do banco) e newlines reais em quebras de linha
+        finalContent = finalContent.replace(/\\n/g, '\n');
+        finalSubject = finalSubject.replace(/\\n/g, ' ');
+
         await sendEmail(to, finalSubject, finalContent);
         console.log(`E-mail enviado para ${to}: ${finalSubject}`);
         res.writeHead(200, {'Content-Type': 'application/json'});
