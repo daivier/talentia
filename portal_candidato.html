@@ -326,7 +326,7 @@ button{cursor:pointer;}
           <div style="font-size:13px;font-weight:500;margin-bottom:8px">Privacidade & LGPD</div>
           <div style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.6">Seus dados são tratados conforme a LGPD. Você pode exportar ou excluir seus dados a qualquer momento.</div>
           <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost" style="font-size:12px"><i class="ti ti-download"></i> Exportar dados</button>
+            <button class="btn btn-ghost" style="font-size:12px" onclick="exportarDados()"><i class="ti ti-download"></i> Exportar dados</button>
             <button class="btn" style="background:var(--danger-l);color:var(--danger);font-size:12px" onclick="deleteAccount()"><i class="ti ti-trash"></i> Excluir dados</button>
             <button class="btn btn-ghost" style="font-size:12px;margin-left:auto" onclick="doLogout()"><i class="ti ti-logout"></i> Sair</button>
           </div>
@@ -1097,6 +1097,30 @@ async function savePerfil() {
     if (error) throw error;
     toast('Perfil salvo!','success');
   } catch(e) { toast('Erro: '+e.message,'error'); }
+}
+
+async function exportarDados() {
+  if (!currentCandidato) { alert('Você precisa estar logado para exportar seus dados.'); return; }
+  try {
+    var [candRes, appsRes] = await Promise.all([
+      sb.from('candidatos').select('*').eq('id', currentCandidato.id).single(),
+      sb.from('candidaturas').select('*, vagas(titulo,area,modalidade,tipo_contrato)').eq('candidato_id', currentCandidato.id)
+    ]);
+    var exportData = {
+      exportado_em: new Date().toISOString(),
+      perfil: candRes.data,
+      candidaturas: appsRes.data || []
+    };
+    var blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'meus_dados_talentai.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) { alert('Erro ao exportar: ' + e.message); }
 }
 
 async function deleteAccount() {
