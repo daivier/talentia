@@ -925,6 +925,12 @@ async function submitApply() {
       console.warn('Score IA não calculado:', e.message);
     });
 
+    // 4. E-mail automático de confirmação
+    enviarEmailAutomaticoPortal('candidatura_recebida', currentCandidato.email, {
+      nome: currentCandidato.nome,
+      cargo: applyJob.titulo
+    });
+
     // 3. Mostra tela de sucesso imediatamente
     document.getElementById('apply-modal-body').innerHTML = `
       <div style="text-align:center;padding:2.5rem 1rem">
@@ -955,6 +961,20 @@ async function submitApply() {
     if (e.message.includes('duplicate')) { toast('Você já se candidatou a esta vaga','error'); }
     else { toast('Erro: '+e.message,'error'); }
   }
+}
+
+async function enviarEmailAutomaticoPortal(gatilho, email, vars) {
+  if (window.location.protocol === 'file:') return;
+  try {
+    var { data: tpls } = await sb.from('email_templates').select('*').eq('empresa_id', EMPRESA_ID).eq('gatilho', gatilho).eq('ativo', true);
+    if (!tpls || !tpls.length) return;
+    var tpl = tpls[0];
+    await fetch('/api/email', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to: email, subject: tpl.assunto, content: tpl.corpo, vars})
+    });
+  } catch(e) { console.warn('Erro e-mail automático:', e.message); }
 }
 
 async function calcularScorePortal(candidaturaId, candidato, vaga) {

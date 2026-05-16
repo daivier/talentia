@@ -1535,7 +1535,15 @@ async function avancarEtapa(candidaturaId, etapaAtual) {
     var { error } = await sb.from('candidaturas').update({etapa:novaEtapa}).eq('id',candidaturaId);
     if (error) throw error;
     toast('Avançado para: '+etapaLabel(novaEtapa),'success');
-    // Recarrega a view ativa automaticamente
+
+    // E-mail automático
+    var { data: candData } = await sb.from('candidaturas').select('candidatos(nome,email), vagas(titulo)').eq('id',candidaturaId).single();
+    if (candData?.candidatos?.email) {
+      var vars = { nome: candData.candidatos.nome, cargo: candData.vagas?.titulo || '', etapa: etapaLabel(novaEtapa) };
+      var gatilho = novaEtapa === 'reprovado' ? 'feedback_reprovacao' : 'avanco_etapa';
+      enviarEmailAutomatico(gatilho, candData.candidatos.email, vars);
+    }
+
     var viewAtiva = document.querySelector('.view.active')?.id;
     if (viewAtiva === 'v-pipeline') loadPipeline();
     else if (viewAtiva === 'v-candidatos') loadCandidatos();
@@ -1711,11 +1719,24 @@ async function saveEntrevista() {
   var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00-03:00`,tipo:document.getElementById('ag-tipo').value,formato:document.getElementById('ag-formato').value,link_video:document.getElementById('ag-link').value||null,status:'agendada'};
   if (demoMode) { DEMO.entrevistas.push({...payload,id:Date.now().toString(),candidato_nome:'Novo candidato',vaga_titulo:'—'}); closeModal('m-agendar'); loadEntrevistas(); toast('Entrevista agendada (demo)','success'); return; }
   try {
-    var { error } = await sb.from('entrevistas').insert(payload);
+    var { data: entData, error } = await sb.from('entrevistas').insert(payload).select('candidatura_id').single();
     if (error) throw error;
     closeModal('m-agendar');
     toast('Entrevista agendada!','success');
     loadEntrevistas();
+
+    // E-mail automático
+    var { data: candData } = await sb.from('candidaturas').select('candidatos(nome,email), vagas(titulo)').eq('id', entData.candidatura_id).single();
+    if (candData?.candidatos?.email) {
+      enviarEmailAutomatico('entrevista_agendada', candData.candidatos.email, {
+        nome: candData.candidatos.nome,
+        cargo: candData.vagas?.titulo || '',
+        data: data,
+        hora: hora,
+        formato: document.getElementById('ag-formato').value,
+        link: document.getElementById('ag-link').value || ''
+      });
+    }
   } catch(e) { toast('Erro: '+e.message,'error'); }
 }
 
