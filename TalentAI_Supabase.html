@@ -648,7 +648,13 @@ button{cursor:pointer;}
         <div class="form-group"><label class="form-label-sm">Salário mín.</label><input class="f-input" id="nv-salario-min" type="number" placeholder="Ex: 8000"></div>
         <div class="form-group"><label class="form-label-sm">Salário máx.</label><input class="f-input" id="nv-salario" type="number" placeholder="Ex: 20000"></div>
       </div>
-      <div class="form-group"><label class="form-label-sm">Descrição</label><textarea class="f-input" id="nv-descricao" rows="4" placeholder="Descreva a vaga..."></textarea></div>
+      <div class="form-group">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <label class="form-label-sm" style="margin-bottom:0">Descrição</label>
+          <button class="btn btn-ghost btn-sm" type="button" id="btn-gerar-jd" onclick="gerarJD()" style="font-size:11px;padding:2px 8px"><i class="ti ti-sparkles"></i> Gerar com IA</button>
+        </div>
+        <textarea class="f-input" id="nv-descricao" rows="4" placeholder="Descreva a vaga ou clique em 'Gerar com IA'..."></textarea>
+      </div>
       <div class="form-group"><label class="form-label-sm">Tags (separadas por vírgula)</label><input class="f-input" id="nv-tags" placeholder="Ex: Java, Kafka, AWS"></div>
     </div>
     <div class="modal-foot">
@@ -1106,6 +1112,62 @@ function editVaga(id) {
   document.getElementById('nv-tags').value = (v.tags||[]).join(', ');
   closeModal('m-detalhe-vaga');
   openModal('m-nova-vaga');
+}
+
+async function gerarJD() {
+  var titulo = document.getElementById('nv-titulo').value.trim();
+  var area = document.getElementById('nv-area').value.trim();
+  var modalidade = document.getElementById('nv-modalidade').value;
+  var contrato = document.getElementById('nv-contrato').value;
+  if (!titulo) { toast('Preencha o cargo antes de gerar', 'error'); return; }
+  var btn = document.getElementById('btn-gerar-jd');
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Gerando...';
+  btn.disabled = true;
+  try {
+    var prompt = `Crie uma descrição completa de vaga de emprego para o cargo abaixo. Retorne APENAS o texto da descrição, sem markdown, sem títulos com #, usando as seções separadas por linha em branco.
+
+Cargo: ${titulo}
+Área: ${area || 'não informado'}
+Modalidade: ${modalidade}
+Contrato: ${contrato}
+
+Estruture exatamente assim (escreva o título da seção em maiúsculas seguido de dois pontos e o conteúdo abaixo):
+
+SOBRE A VAGA:
+[2-3 frases apresentando a empresa e a oportunidade]
+
+RESPONSABILIDADES:
+[lista de 5-7 responsabilidades, uma por linha iniciando com •]
+
+REQUISITOS:
+[lista de 4-6 requisitos, uma por linha iniciando com •]
+
+DIFERENCIAIS:
+[lista de 3-4 diferenciais, uma por linha iniciando com •]
+
+BENEFÍCIOS:
+[lista de 4-5 benefícios, uma por linha iniciando com •]`;
+
+    var r = await fetch('/api/ai', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 800,
+        system: 'Você é um especialista em recrutamento e employer branding. Escreva descrições de vagas claras, objetivas e atrativas em português brasileiro.',
+        messages: [{role:'user', content: prompt}]
+      })
+    });
+    var d = await r.json();
+    var texto = d.content[0].text.trim();
+    document.getElementById('nv-descricao').value = texto;
+    toast('Descrição gerada com sucesso!', 'success');
+  } catch(e) {
+    toast('Erro ao gerar: '+e.message, 'error');
+  } finally {
+    btn.innerHTML = '<i class="ti ti-sparkles"></i> Gerar com IA';
+    btn.disabled = false;
+  }
 }
 
 async function alterarStatusVaga(id, novoStatus) {
