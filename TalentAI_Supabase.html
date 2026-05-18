@@ -1796,7 +1796,7 @@ async function saveOferta() {
         nome: candData.candidatos.nome,
         cargo: candData.vagas?.titulo || '',
         salario: 'R$ ' + salario.toLocaleString('pt-BR'),
-        data_inicio: dataInicio || ''
+        data_inicio: dataInicio ? dataInicio.split('-').reverse().join('/') : ''
       });
     }
   } catch(e) { toast('Erro: '+e.message,'error'); }
