@@ -20,6 +20,9 @@ loadEnv();
 
 const PORT = process.env.PORT || 3000;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const EMPRESA_ID = process.env.EMPRESA_ID || 'a0000000-0000-0000-0000-000000000001';
 
 // ── Configuração de e-mail SMTP ───────────────────────────
 const SMTP_HOST = process.env.SMTP_HOST || '';
@@ -225,7 +228,91 @@ server.listen(PORT, () => {
   console.log(`   IA: ${ANTHROPIC_KEY ? '✓' : '✗ não configurada'}`);
   console.log(`   SMTP: ${SMTP_HOST ? '✓ ' + SMTP_HOST : '✗ não configurado'}`);
   console.log('\n   Ctrl+C para parar\n');
+  if (SUPABASE_URL && SUPABASE_KEY) iniciarLembretes();
 });
+
+// ── Lembrete de entrevista (cron a cada hora) ─────────────
+function supabaseGet(path) {
+  return new Promise((resolve, reject) => {
+    var options = {
+      hostname: SUPABASE_URL.replace('https://','').replace('http://',''),
+      path,
+      method: 'GET',
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+    };
+    var req = https.request(options, res => {
+      var data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => resolve(JSON.parse(data)));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function verificarLembretes() {
+  if (!SMTP_HOST) return;
+  try {
+    var agora = new Date();
+    var em24h = new Date(agora.getTime() + 24 * 60 * 60 * 1000);
+    var agoraISO = agora.toISOString();
+    var em24hISO = em24h.toISOString();
+
+    // Busca entrevistas nas próximas 24h ainda não lembradas
+    var entrevistas = await supabaseGet(
+      `/rest/v1/entrevistas?select=id,data_hora,link_video,candidaturas(candidatos(nome,email),vagas(titulo))&data_hora=gte.${agoraISO}&data_hora=lte.${em24hISO}&lembrete_enviado=is.null&status=eq.agendada`
+    );
+
+    for (var ent of (entrevistas || [])) {
+      var cand = ent.candidaturas?.candidatos;
+      var vaga = ent.candidaturas?.vagas;
+      if (!cand?.email) continue;
+
+      // Busca template de lembrete
+      var tpls = await supabaseGet(
+        `/rest/v1/email_templates?select=assunto,corpo&empresa_id=eq.${EMPRESA_ID}&gatilho=eq.lembrete_entrevista&ativo=is.true`
+      );
+      if (!tpls?.length) continue;
+      var tpl = tpls[0];
+
+      var dataHora = new Date(ent.data_hora);
+      var vars = {
+        nome: cand.nome,
+        cargo: vaga?.titulo || '',
+        data: dataHora.toLocaleDateString('pt-BR'),
+        hora: dataHora.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}),
+        link_agenda: ent.link_video || ''
+      };
+
+      var subject = renderTemplate(tpl.assunto, vars).replace(/\\n/g,' ');
+      var body = renderTemplate(tpl.corpo, vars).replace(/\\n/g,'\n');
+      await sendEmail(cand.email, subject, body);
+
+      // Marca como lembrete enviado
+      await new Promise((resolve, reject) => {
+        var patch = JSON.stringify({lembrete_enviado: new Date().toISOString()});
+        var opts = {
+          hostname: SUPABASE_URL.replace('https://','').replace('http://',''),
+          path: `/rest/v1/entrevistas?id=eq.${ent.id}`,
+          method: 'PATCH',
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(patch) }
+        };
+        var r = https.request(opts, res => { res.on('data',()=>{}); res.on('end', resolve); });
+        r.on('error', reject);
+        r.write(patch);
+        r.end();
+      });
+
+      console.log(`Lembrete enviado para ${cand.email} — ${vaga?.titulo}`);
+    }
+  } catch(e) { console.warn('Erro ao verificar lembretes:', e.message); }
+}
+
+function iniciarLembretes() {
+  verificarLembretes();
+  setInterval(verificarLembretes, 60 * 60 * 1000); // a cada hora
+  console.log('   Lembretes: ✓ verificando a cada hora\n');
+}
 // Roda o sistema e faz proxy seguro para a API da Anthropic
 // 
 // Como usar:

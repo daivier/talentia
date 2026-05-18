@@ -457,7 +457,7 @@ button{cursor:pointer;}
         <div><div id="email-templates-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando templates...</div></div></div>
         <div class="card">
           <div class="card-hd"><div class="card-title" id="et-editor-title">Editor</div><div class="card-action" onclick="genEmailAI()">Gerar IA ✨</div></div>
-          <div class="form-group"><label class="form-label-sm">Gatilho</label><select class="f-input" id="et-gatilho"><option value="candidatura_recebida">Candidatura recebida</option><option value="candidato_aprovado">Candidato aprovado</option><option value="feedback_reprovacao">Feedback reprovação</option><option value="convite_entrevista">Convite entrevista</option></select></div>
+          <div class="form-group"><label class="form-label-sm">Gatilho</label><select class="f-input" id="et-gatilho"><option value="candidatura_recebida">Candidatura recebida</option><option value="candidato_aprovado">Candidato aprovado</option><option value="feedback_reprovacao">Feedback reprovação</option><option value="contratado">Contratado</option><option value="oferta_enviada">Oferta enviada</option><option value="lembrete_entrevista">Lembrete entrevista</option></select></div>
           <div class="form-group"><label class="form-label-sm">Assunto</label><input class="f-input" id="et-assunto" placeholder="Assunto do e-mail"></div>
           <div class="form-group"><label class="form-label-sm">Corpo</label><textarea class="f-input" id="et-corpo" rows="6" placeholder="Conteúdo do e-mail..."></textarea></div>
           <div id="et-ai-preview" style="display:none;background:var(--accent-l);border-radius:var(--r-sm);padding:10px;font-size:12px;color:var(--accent-d);margin-bottom:10px;line-height:1.6"></div>
@@ -1544,7 +1544,8 @@ async function avancarEtapa(candidaturaId, etapaAtual) {
     var { data: candData } = await sb.from('candidaturas').select('candidatos(nome,email), vagas(titulo)').eq('id',candidaturaId).single();
     if (candData?.candidatos?.email) {
       var vars = { nome: candData.candidatos.nome, cargo: candData.vagas?.titulo || '', etapa: etapaLabel(novaEtapa) };
-      var gatilho = novaEtapa === 'reprovado' ? 'feedback_reprovacao' : 'avanco_etapa';
+      var gatilho = novaEtapa === 'reprovado' ? 'feedback_reprovacao' : novaEtapa === 'contratado' ? 'contratado' : null;
+      if (!gatilho) return;
       enviarEmailAutomatico(gatilho, candData.candidatos.email, vars);
     }
 
@@ -1778,11 +1779,22 @@ async function saveOferta() {
   if (!cid || !sal) { toast('Preencha os campos','error'); return; }
   if (demoMode) { closeModal('m-nova-oferta'); toast('Oferta criada (demo)','success'); return; }
   try {
-    var { error } = await sb.from('ofertas').insert({candidatura_id:cid,salario:Number(sal),bonus_signing:Number(document.getElementById('of-bonus').value)||0,data_inicio:document.getElementById('of-inicio').value||null,validade:document.getElementById('of-validade').value||null,status:'pendente'});
+    var salario = Number(sal);
+    var dataInicio = document.getElementById('of-inicio').value || null;
+    var { error } = await sb.from('ofertas').insert({candidatura_id:cid,salario:salario,bonus_signing:Number(document.getElementById('of-bonus').value)||0,data_inicio:dataInicio,validade:document.getElementById('of-validade').value||null,status:'pendente'});
     if (error) throw error;
     closeModal('m-nova-oferta');
     toast('Oferta salva no banco!','success');
     loadOfertas();
+    var { data: candData } = await sb.from('candidaturas').select('candidatos(nome,email), vagas(titulo)').eq('id', cid).single();
+    if (candData?.candidatos?.email) {
+      enviarEmailAutomatico('oferta_enviada', candData.candidatos.email, {
+        nome: candData.candidatos.nome,
+        cargo: candData.vagas?.titulo || '',
+        salario: 'R$ ' + salario.toLocaleString('pt-BR'),
+        data_inicio: dataInicio || ''
+      });
+    }
   } catch(e) { toast('Erro: '+e.message,'error'); }
 }
 
