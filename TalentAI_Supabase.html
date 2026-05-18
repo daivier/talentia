@@ -1722,6 +1722,7 @@ async function saveEntrevista() {
   var hora = document.getElementById('ag-hora').value;
   var formato = document.getElementById('ag-formato').value;
   var formatoLabel = {'video':'Videoconferência','presencial':'Presencial','hibrido':'Híbrido'}[formato] || formato;
+  var labelLocal = formato === 'presencial' ? 'Local da entrevista' : 'Link de acesso';
   var linkAgenda = document.getElementById('ag-link').value.trim();
   if (!cid || !data || !hora) { toast('Preencha todos os campos','error'); return; }
   if (!linkAgenda) { toast('Informe o link de videoconferência ou endereço','error'); return; }
@@ -1741,7 +1742,7 @@ async function saveEntrevista() {
       enviarEmailAutomatico('candidato_aprovado', candData.candidatos.email, {
         nome: candData.candidatos.nome,
         cargo: candData.vagas?.titulo || '',
-        data: dataFormatada, hora, formato: formatoLabel, link_agenda: linkAgenda
+        data: dataFormatada, hora, formato: formatoLabel, label_local: labelLocal, link_agenda: linkAgenda
       });
     }
   } catch(e) { toast('Erro: '+e.message,'error'); }
@@ -2229,7 +2230,7 @@ var sugestoesTemplate = {
   },
   candidato_aprovado: {
     assunto: 'Sua entrevista para {cargo} está agendada!',
-    corpo: 'Olá {nome},\n\nTemos ótimas notícias! Gostaríamos de avançar com você no processo seletivo para a vaga de {cargo}.\n\nSua entrevista está agendada para o dia {data} às {hora} ({formato}).\n\nLink de acesso: {link_agenda}\n\nCaso tenha alguma dúvida, entre em contato conosco.\n\nAtenciosamente,\n{recrutador}'
+    corpo: 'Olá {nome},\n\nTemos ótimas notícias! Gostaríamos de avançar com você no processo seletivo para a vaga de {cargo}.\n\nSua entrevista está agendada para o dia {data} às {hora} ({formato}).\n\n{label_local}: {link_agenda}\n\nCaso tenha alguma dúvida, entre em contato conosco.\n\nAtenciosamente,\n{recrutador}'
   },
   feedback_reprovacao: {
     assunto: 'Atualização sobre sua candidatura para {cargo}',
