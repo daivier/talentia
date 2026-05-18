@@ -1721,9 +1721,11 @@ async function saveEntrevista() {
   var data = document.getElementById('ag-data').value;
   var hora = document.getElementById('ag-hora').value;
   var formato = document.getElementById('ag-formato').value;
+  var formatoLabel = {'video':'Videoconferência','presencial':'Presencial','hibrido':'Híbrido'}[formato] || formato;
   var linkAgenda = document.getElementById('ag-link').value.trim();
   if (!cid || !data || !hora) { toast('Preencha todos os campos','error'); return; }
   if (!linkAgenda) { toast('Informe o link de videoconferência ou endereço','error'); return; }
+  var dataFormatada = data.split('-').reverse().join('/');
   var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00-03:00`,tipo:document.getElementById('ag-tipo').value,formato,link_video:linkAgenda||null,status:'agendada'};
   if (demoMode) { DEMO.entrevistas.push({...payload,id:Date.now().toString(),candidato_nome:'Novo candidato',vaga_titulo:'—'}); closeModal('m-agendar'); loadEntrevistas(); toast('Entrevista agendada (demo)','success'); return; }
   try {
@@ -1739,7 +1741,7 @@ async function saveEntrevista() {
       enviarEmailAutomatico('candidato_aprovado', candData.candidatos.email, {
         nome: candData.candidatos.nome,
         cargo: candData.vagas?.titulo || '',
-        data, hora, formato, link_agenda: linkAgenda
+        data: dataFormatada, hora, formato: formatoLabel, link_agenda: linkAgenda
       });
     }
   } catch(e) { toast('Erro: '+e.message,'error'); }
