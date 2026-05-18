@@ -1647,12 +1647,19 @@ async function loadPipeline() {
     try {
       var { data } = await sb.from('v_pipeline').select('*').order('score_ia',{ascending:false});
       source = data || [];
+      // Popular filtro de vagas
+      var sel = document.getElementById('pipeline-vaga-filter');
+      var vagaAtual = sel.value;
+      var vagas = [...new Map(source.filter(c=>c.vaga_titulo).map(c=>[c.vaga_id||c.vaga_titulo, c.vaga_titulo])).entries()];
+      sel.innerHTML = '<option value="">Todas as vagas</option>' + vagas.map(([id,titulo])=>`<option value="${id}">${titulo}</option>`).join('');
+      if (vagaAtual) sel.value = vagaAtual;
     } catch(e) { wrap.innerHTML = `<div class="empty-state"><i class="ti ti-alert-circle"></i>Erro: ${e.message}</div>`; return; }
   }
+  var filtroVaga = document.getElementById('pipeline-vaga-filter')?.value || '';
   var etapas = ['inscrito','triagem_ia','entrevista_rh','entrevista_tecnica','finalista','oferta','contratado'];
   var labels = {inscrito:'Inscritos',triagem_ia:'Triagem IA',entrevista_rh:'Ent. RH',entrevista_tecnica:'Técnica',finalista:'Finalistas',oferta:'Oferta',contratado:'Contratados'};
-  var comVaga = source.filter(c => c.candidatura_id && c.candidatura_id !== '');
-  var semVaga = source.filter(c => !c.candidatura_id || c.candidatura_id === '');
+  var comVaga = source.filter(c => c.candidatura_id && c.candidatura_id !== '' && (!filtroVaga || (c.vaga_id||c.vaga_titulo) === filtroVaga));
+  var semVaga = !filtroVaga ? source.filter(c => !c.candidatura_id || c.candidatura_id === '') : [];
 
   wrap.innerHTML = etapas.map(e => {
     var cards = comVaga.filter(c=>c.etapa===e);
