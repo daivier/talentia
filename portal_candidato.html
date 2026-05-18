@@ -1026,10 +1026,12 @@ Score de 0 a 100. Análise em 3-4 linhas.`;
   var result = JSON.parse(text);
   var score = Math.min(100, Math.max(0, Math.round(result.score)));
 
-  // Salva no banco
+  // Salva score e avança etapa automaticamente
+  var novaEtapa = score >= 70 ? 'triagem_ia' : 'reprovado';
   await sb.from('candidaturas').update({
     score_ia: score,
-    analise_ia: result.analise || ''
+    analise_ia: result.analise || '',
+    etapa: novaEtapa
   }).eq('id', candidaturaId);
 
   // Atualiza a UI de sucesso se ainda estiver aberta
