@@ -1719,8 +1719,10 @@ async function saveEntrevista() {
   var cid = document.getElementById('ag-candidatura').value;
   var data = document.getElementById('ag-data').value;
   var hora = document.getElementById('ag-hora').value;
+  var formato = document.getElementById('ag-formato').value;
+  var linkAgenda = document.getElementById('ag-link').value || '';
   if (!cid || !data || !hora) { toast('Preencha todos os campos','error'); return; }
-  var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00-03:00`,tipo:document.getElementById('ag-tipo').value,formato:document.getElementById('ag-formato').value,link_video:document.getElementById('ag-link').value||null,status:'agendada'};
+  var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00-03:00`,tipo:document.getElementById('ag-tipo').value,formato,link_video:linkAgenda||null,status:'agendada'};
   if (demoMode) { DEMO.entrevistas.push({...payload,id:Date.now().toString(),candidato_nome:'Novo candidato',vaga_titulo:'—'}); closeModal('m-agendar'); loadEntrevistas(); toast('Entrevista agendada (demo)','success'); return; }
   try {
     var { data: entData, error } = await sb.from('entrevistas').insert(payload).select('candidatura_id').single();
@@ -1735,10 +1737,7 @@ async function saveEntrevista() {
       enviarEmailAutomatico('candidato_aprovado', candData.candidatos.email, {
         nome: candData.candidatos.nome,
         cargo: candData.vagas?.titulo || '',
-        data: data,
-        hora: hora,
-        formato: document.getElementById('ag-formato').value,
-        link_agenda: document.getElementById('ag-link').value || ''
+        data, hora, formato, link_agenda: linkAgenda
       });
     }
   } catch(e) { toast('Erro: '+e.message,'error'); }
