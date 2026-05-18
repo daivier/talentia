@@ -1557,19 +1557,21 @@ async function avancarEtapa(candidaturaId, etapaAtual) {
     if (error) throw error;
     toast('Avançado para: '+etapaLabel(novaEtapa),'success');
 
-    // E-mail automático
-    var { data: candData } = await sb.from('candidaturas').select('candidatos(nome,email), vagas(titulo)').eq('id',candidaturaId).single();
-    if (candData?.candidatos?.email) {
-      var vars = { nome: candData.candidatos.nome, cargo: candData.vagas?.titulo || '', etapa: etapaLabel(novaEtapa) };
-      var gatilho = novaEtapa === 'reprovado' ? 'feedback_reprovacao' : novaEtapa === 'contratado' ? 'contratado' : null;
-      if (!gatilho) return;
-      enviarEmailAutomatico(gatilho, candData.candidatos.email, vars);
-    }
-
+    // Atualiza UI imediatamente
     var viewAtiva = document.querySelector('.view.active')?.id;
     if (viewAtiva === 'v-pipeline') loadPipeline();
     else if (viewAtiva === 'v-candidatos') loadCandidatos();
     else if (viewAtiva === 'v-dash') loadDashboard();
+
+    // E-mail automático (só para etapas com gatilho)
+    var gatilho = novaEtapa === 'reprovado' ? 'feedback_reprovacao' : novaEtapa === 'contratado' ? 'contratado' : null;
+    if (gatilho) {
+      var { data: candData } = await sb.from('candidaturas').select('candidatos(nome,email), vagas(titulo)').eq('id',candidaturaId).single();
+      if (candData?.candidatos?.email) {
+        var vars = { nome: candData.candidatos.nome, cargo: candData.vagas?.titulo || '', etapa: etapaLabel(novaEtapa) };
+        enviarEmailAutomatico(gatilho, candData.candidatos.email, vars);
+      }
+    }
   } catch(e) { toast('Erro: '+e.message,'error'); }
 }
 
