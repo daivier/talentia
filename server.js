@@ -260,7 +260,7 @@ async function verificarLembretes() {
 
     // Busca entrevistas nas próximas 24h ainda não lembradas
     var entrevistas = await supabaseGet(
-      `/rest/v1/entrevistas?select=id,data_hora,link_video,candidaturas(candidatos(nome,email),vagas(titulo))&data_hora=gte.${agoraISO}&data_hora=lte.${em24hISO}&lembrete_enviado=is.null&status=eq.agendada`
+      `/rest/v1/entrevistas?select=id,data_hora,link_video,formato,candidaturas(candidatos(nome,email),vagas(titulo))&data_hora=gte.${agoraISO}&data_hora=lte.${em24hISO}&lembrete_enviado=is.null&status=eq.agendada`
     );
 
     for (var ent of (entrevistas || [])) {
@@ -276,12 +276,16 @@ async function verificarLembretes() {
       var tpl = tpls[0];
 
       var dataHora = new Date(ent.data_hora);
+      var formato = ent.formato || 'video';
       var vars = {
         nome: cand.nome,
         cargo: vaga?.titulo || '',
         data: dataHora.toLocaleDateString('pt-BR'),
         hora: dataHora.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}),
-        link_agenda: ent.link_video || ''
+        link_agenda: ent.link_video || '',
+        label_local: formato === 'presencial' ? 'Local da entrevista' : 'Link de acesso',
+        empresa: 'TalentAI',
+        recrutador: 'RH'
       };
 
       var subject = renderTemplate(tpl.assunto, vars).replace(/\\n/g,' ');
