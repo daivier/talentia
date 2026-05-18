@@ -709,7 +709,7 @@ button{cursor:pointer;}
         <div class="form-group"><label class="form-label-sm">Tipo</label><select class="f-input" id="ag-tipo"><option value="rh">RH</option><option value="tecnica">Técnica</option><option value="final">Final</option></select></div>
         <div class="form-group"><label class="form-label-sm">Formato</label><select class="f-input" id="ag-formato"><option value="video">Videoconferência</option><option value="presencial">Presencial</option></select></div>
       </div>
-      <div class="form-group"><label class="form-label-sm">Link de videoconferência</label><input class="f-input" id="ag-link" placeholder="https://meet.google.com/..."></div>
+      <div class="form-group"><label class="form-label-sm">Link de videoconferência / Endereço *</label><input class="f-input" id="ag-link" placeholder="https://meet.google.com/... ou endereço presencial"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost btn-sm" onclick="closeModal('m-agendar')">Cancelar</button>
@@ -1721,8 +1721,9 @@ async function saveEntrevista() {
   var data = document.getElementById('ag-data').value;
   var hora = document.getElementById('ag-hora').value;
   var formato = document.getElementById('ag-formato').value;
-  var linkAgenda = document.getElementById('ag-link').value || '';
+  var linkAgenda = document.getElementById('ag-link').value.trim();
   if (!cid || !data || !hora) { toast('Preencha todos os campos','error'); return; }
+  if (!linkAgenda) { toast('Informe o link de videoconferência ou endereço','error'); return; }
   var payload = {candidatura_id:cid,data_hora:`${data}T${hora}:00-03:00`,tipo:document.getElementById('ag-tipo').value,formato,link_video:linkAgenda||null,status:'agendada'};
   if (demoMode) { DEMO.entrevistas.push({...payload,id:Date.now().toString(),candidato_nome:'Novo candidato',vaga_titulo:'—'}); closeModal('m-agendar'); loadEntrevistas(); toast('Entrevista agendada (demo)','success'); return; }
   try {
