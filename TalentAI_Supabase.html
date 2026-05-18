@@ -457,7 +457,7 @@ button{cursor:pointer;}
         <div><div id="email-templates-list"><div class="loading"><i class="ti ti-loader-2"></i> Carregando templates...</div></div></div>
         <div class="card">
           <div class="card-hd"><div class="card-title" id="et-editor-title">Editor</div><div class="card-action" onclick="genEmailAI()">Gerar IA ✨</div></div>
-          <div class="form-group"><label class="form-label-sm">Gatilho</label><select class="f-input" id="et-gatilho"><option value="candidatura_recebida">Candidatura recebida</option><option value="candidato_aprovado">Candidato aprovado</option><option value="feedback_reprovacao">Feedback reprovação</option><option value="contratado">Contratado</option><option value="oferta_enviada">Oferta enviada</option><option value="lembrete_entrevista">Lembrete entrevista</option></select></div>
+          <div class="form-group"><label class="form-label-sm">Gatilho</label><select class="f-input" id="et-gatilho" onchange="preencherSugestaoTemplate(this.value)"><option value="candidatura_recebida">Candidatura recebida</option><option value="candidato_aprovado">Candidato aprovado</option><option value="feedback_reprovacao">Feedback reprovação</option><option value="contratado">Contratado</option><option value="oferta_enviada">Oferta enviada</option><option value="lembrete_entrevista">Lembrete entrevista</option></select></div>
           <div class="form-group"><label class="form-label-sm">Assunto</label><input class="f-input" id="et-assunto" placeholder="Assunto do e-mail"></div>
           <div class="form-group"><label class="form-label-sm">Corpo</label><textarea class="f-input" id="et-corpo" rows="6" placeholder="Conteúdo do e-mail..."></textarea></div>
           <div id="et-ai-preview" style="display:none;background:var(--accent-l);border-radius:var(--r-sm);padding:10px;font-size:12px;color:var(--accent-d);margin-bottom:10px;line-height:1.6"></div>
@@ -2217,6 +2217,41 @@ function editarEmailTemplate(id) {
   document.getElementById('et-editor-title').textContent = 'Editando template';
   document.getElementById('et-save-btn').textContent = 'Salvar alterações';
   document.getElementById('et-editor-title').style.color = 'var(--accent)';
+}
+
+var sugestoesTemplate = {
+  candidatura_recebida: {
+    assunto: 'Sua candidatura para {cargo} foi recebida',
+    corpo: 'Olá {nome},\n\nRecebemos sua candidatura para a vaga de {cargo} na {empresa}!\n\nNossa equipe irá analisar seu perfil em até 3 dias úteis.\n\nAcompanhe o status em: {link_portal}\n\nAtenciosamente,\n{recrutador}'
+  },
+  candidato_aprovado: {
+    assunto: 'Sua entrevista para {cargo} está agendada!',
+    corpo: 'Olá {nome},\n\nTemos ótimas notícias! Ficamos impressionados com seu perfil e gostaríamos de avançar com você no processo seletivo para a vaga de {cargo}.\n\nSua entrevista está agendada. Acesse pelo link abaixo no dia e horário combinados:\n\n{link_agenda}\n\nCaso tenha alguma dúvida, entre em contato conosco.\n\nAtenciosamente,\n{recrutador}'
+  },
+  feedback_reprovacao: {
+    assunto: 'Atualização sobre sua candidatura para {cargo}',
+    corpo: 'Olá {nome},\n\nAgradecemos seu interesse e o tempo dedicado ao processo seletivo para {cargo}.\n\nApós análise cuidadosa, seguiremos com outros candidatos desta vez.\n\nGuardaremos seu perfil para oportunidades futuras.\n\nAtenciosamente,\n{recrutador}'
+  },
+  contratado: {
+    assunto: 'Parabéns! Você foi contratado para {cargo}',
+    corpo: 'Olá {nome},\n\nÉ com grande satisfação que comunicamos que você foi selecionado para a vaga de {cargo} na {empresa}!\n\nEntraremos em contato em breve com os próximos passos para sua admissão.\n\nSeja bem-vindo(a) ao time!\n\nAtenciosamente,\n{recrutador}'
+  },
+  oferta_enviada: {
+    assunto: 'Proposta de trabalho — {cargo}',
+    corpo: 'Olá {nome},\n\nTemos o prazer de enviar nossa proposta formal para a vaga de {cargo}.\n\nSalário: {salario}\nData de início prevista: {data_inicio}\n\nPor favor, analise a proposta e entre em contato para confirmar sua aceitação.\n\nAtenciosamente,\n{recrutador}'
+  },
+  lembrete_entrevista: {
+    assunto: 'Lembrete: sua entrevista para {cargo} é amanhã',
+    corpo: 'Olá {nome},\n\nEste é um lembrete de que sua entrevista para a vaga de {cargo} está agendada para amanhã, dia {data} às {hora}.\n\nAcesse pelo link: {link_agenda}\n\nQualquer dúvida, estamos à disposição.\n\nAtenciosamente,\n{recrutador}'
+  }
+};
+
+function preencherSugestaoTemplate(gatilho) {
+  if (editingTemplateId) return; // não sobrescreve se estiver editando
+  var s = sugestoesTemplate[gatilho];
+  if (!s) return;
+  document.getElementById('et-assunto').value = s.assunto;
+  document.getElementById('et-corpo').value = s.corpo;
 }
 
 function loadTemplateEditor(id) {
