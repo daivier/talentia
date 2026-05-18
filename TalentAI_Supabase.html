@@ -1392,6 +1392,7 @@ async function openCandidatoDetail(candidatoId, candidaturaId) {
       ${candidaturaId ? `
         <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-mensagens');abrirChatCandidato('${candidaturaId}','${c.nome}')"><i class="ti ti-message"></i> Mensagem</button>
         <button class="btn btn-ghost btn-sm" onclick="closeModal('m-candidato');openView('v-agenda')"><i class="ti ti-calendar"></i> Agendar</button>
+        ${cand?.etapa !== 'reprovado' && cand?.etapa !== 'contratado' ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="reprovarCandidato('${candidaturaId}','${c.nome}');closeModal('m-candidato')"><i class="ti ti-x"></i> Reprovar</button>` : ''}
         <button class="btn btn-primary btn-sm" onclick="avancarEtapa('${candidaturaId}','${cand?.etapa||'inscrito'}');closeModal('m-candidato')">
           <i class="ti ti-arrow-right"></i> Avançar etapa
         </button>` : `
@@ -1517,6 +1518,22 @@ async function triagemAutomatica() {
     }
     toast('Triagem concluída!', 'success');
     loadPipeline();
+  } catch(e) { toast('Erro: '+e.message, 'error'); }
+}
+
+async function reprovarCandidato(candidaturaId, nome) {
+  if (!confirm(`Reprovar ${nome}? Um e-mail de feedback será enviado.`)) return;
+  try {
+    var { data: cand, error } = await sb.from('candidaturas').update({etapa:'reprovado'}).eq('id', candidaturaId).select('candidatos(nome,email), vagas(titulo)').single();
+    if (error) throw error;
+    loadPipeline();
+    toast(`${nome} reprovado`, 'warn');
+    if (cand?.candidatos?.email) {
+      enviarEmailAutomatico('feedback_reprovacao', cand.candidatos.email, {
+        nome: cand.candidatos.nome,
+        cargo: cand.vagas?.titulo || ''
+      });
+    }
   } catch(e) { toast('Erro: '+e.message, 'error'); }
 }
 
