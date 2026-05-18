@@ -563,6 +563,7 @@ async function doLogin() {
       return;
     }
     closeModal('m-login');
+    setTimeout(() => { var s = document.getElementById('search-input'); if(s){s.value='';} filterJobs(); }, 100);
     onLoggedIn(data);
     toast('Bem-vindo de volta, '+data.nome.split(' ')[0]+'!','success');
   } catch(e) {
@@ -592,6 +593,7 @@ async function doCadastro() {
     }).select().single();
     if (error) throw error;
     closeModal('m-login');
+    setTimeout(() => { var s = document.getElementById('search-input'); if(s){s.value='';} filterJobs(); }, 100);
     onLoggedIn(data);
     toast('Conta criada com sucesso!','success');
   } catch(e) { showCadError('Erro: '+e.message); }
