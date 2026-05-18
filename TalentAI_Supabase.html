@@ -1391,7 +1391,7 @@ async function openCandidatoDetail(candidatoId, candidaturaId) {
       ${c.cv_url ? `<button class="btn btn-ghost btn-sm" title="Baixar CV" onclick="downloadCurriculo('${c.cv_url}','${c.nome}')"><i class="ti ti-download"></i></button>` : ''}
       ${candidaturaId ? `
         <button class="btn btn-ghost btn-sm" title="Mensagem" onclick="closeModal('m-candidato');openView('v-mensagens');abrirChatCandidato('${candidaturaId}','${c.nome}')"><i class="ti ti-message"></i></button>
-        <button class="btn btn-ghost btn-sm" title="Agendar entrevista" onclick="closeModal('m-candidato');openView('v-agenda')"><i class="ti ti-calendar"></i></button>
+        <button class="btn btn-ghost btn-sm" title="Agendar entrevista" onclick="closeModal('m-candidato');openView('v-entrevistas')"><i class="ti ti-calendar"></i></button>
         ${cand?.etapa !== 'reprovado' && cand?.etapa !== 'contratado' ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger)" onclick="reprovarCandidato('${candidaturaId}','${c.nome}');closeModal('m-candidato')"><i class="ti ti-x"></i> Reprovar</button>` : ''}
         <button class="btn btn-primary btn-sm" onclick="avancarEtapa('${candidaturaId}','${cand?.etapa||'inscrito'}');closeModal('m-candidato')">
           <i class="ti ti-arrow-right"></i> Avançar etapa
