@@ -1485,8 +1485,8 @@ O score deve ser um número de 0 a 100. A análise deve ter 3-4 linhas explicand
         </div>`;
     }
     toast('Score calculado: '+score+'%', 'success');
-    // Recarrega lista de candidatos
     loadCandidatos();
+    loadPipeline();
   } catch(e) {
     toast('Erro ao calcular: '+e.message, 'error');
     if (btn) { btn.innerHTML = '<i class="ti ti-sparkles"></i> Recalcular'; btn.disabled = false; }
