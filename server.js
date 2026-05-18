@@ -83,7 +83,7 @@ async function sendEmail(to, subject, body) {
 
 // ── Substitui variáveis no template ──────────────────────
 function renderTemplate(template, vars) {
-  return template.replace(/\{(\w+)\}/g, (match, key) => vars[key] || match);
+  return template.replace(/\{(\w+)\}/g, (match, key) => (key in vars) ? (vars[key] ?? '') : match);
 }
 
 // ── Servidor ──────────────────────────────────────────────
