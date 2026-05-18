@@ -1732,13 +1732,13 @@ async function saveEntrevista() {
     // E-mail automático
     var { data: candData } = await sb.from('candidaturas').select('candidatos(nome,email), vagas(titulo)').eq('id', entData.candidatura_id).single();
     if (candData?.candidatos?.email) {
-      enviarEmailAutomatico('entrevista_agendada', candData.candidatos.email, {
+      enviarEmailAutomatico('candidato_aprovado', candData.candidatos.email, {
         nome: candData.candidatos.nome,
         cargo: candData.vagas?.titulo || '',
         data: data,
         hora: hora,
         formato: document.getElementById('ag-formato').value,
-        link: document.getElementById('ag-link').value || ''
+        link_agenda: document.getElementById('ag-link').value || ''
       });
     }
   } catch(e) { toast('Erro: '+e.message,'error'); }
