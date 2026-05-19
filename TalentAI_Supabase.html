@@ -375,7 +375,7 @@ button{cursor:pointer;}
 
     <!-- IA -->
     <div class="view" id="v-ia">
-      <div class="page-hd"><div><div class="page-title">Assistente IA</div><div class="page-sub">Análise, geração e insights com dados reais do banco</div></div></div>
+      <div class="page-hd"><div><div class="page-title">Assistente IA</div><div class="page-sub">Análise, geração e insights com dados reais do banco</div></div><div class="page-actions"><button class="btn btn-ghost btn-sm" onclick="limparChatIA()" title="Limpar conversa"><i class="ti ti-trash"></i> Limpar</button></div></div>
       <div class="g2" style="align-items:start">
         <div style="display:flex;flex-direction:column;height:420px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden">
           <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border)">
@@ -1461,11 +1461,12 @@ O score deve ser um número de 0 a 100. A análise deve ter 3-4 linhas explicand
     await sb.from('candidaturas').update({score_ia: score, analise_ia: analise}).eq('id', candidaturaId);
 
     // Triagem automática: avança para triagem_ia se score >= 70 e ainda está inscrito
-    if (candAtual?.etapa === 'inscrito') {
-      var novaEtapa = score >= 70 ? 'triagem_ia' : 'reprovado';
-      await sb.from('candidaturas').update({etapa: novaEtapa}).eq('id', candidaturaId);
-      if (novaEtapa === 'triagem_ia') toast(`Score ${score}% — avançado para Triagem IA ✓`, 'success');
-      else toast(`Score ${score}% — candidato reprovado na triagem`, 'warn');
+    // Score < 70 permanece em 'inscrito' para revisão manual do RH (nunca é reprovado automaticamente)
+    if (candAtual?.etapa === 'inscrito' && score >= 70) {
+      await sb.from('candidaturas').update({etapa: 'triagem_ia'}).eq('id', candidaturaId);
+      toast(`Score ${score}% — avançado para Triagem IA ✓`, 'success');
+    } else if (candAtual?.etapa === 'inscrito') {
+      toast(`Score ${score}% — abaixo de 70%, aguardando revisão do RH`, 'warn');
     }
 
     // Atualiza UI (só se o modal estiver aberto)
@@ -2404,6 +2405,7 @@ async function testConnection() {
 // IA COM CONTEXTO DO BANCO
 // ============================================================
 var iaContext = '';
+var iaChatHistory = []; // histórico de conversa para o assistente
 
 async function loadIAContext() {
   var el = document.getElementById('ia-context');
@@ -2413,16 +2415,74 @@ async function loadIAContext() {
     ctx = `Vagas ativas: ${DEMO.vagas.length}\nCandidaturas: ${DEMO.candidaturas.length}\nScore médio: ${Math.round(DEMO.candidaturas.reduce((a,c)=>a+c.score_ia,0)/DEMO.candidaturas.length)}%\nEntrevistas: ${DEMO.entrevistas.length}`;
   } else {
     try {
-      var [v,c] = await Promise.all([
-        sb.from('vagas').select('titulo,area,modalidade',{count:'exact'}).eq('empresa_id',EMPRESA_ID).eq('status','ativa'),
-        sb.from('v_pipeline').select('candidato_nome,vaga_titulo,etapa,score_ia').order('score_ia',{ascending:false}).limit(10)
+      // Busca resumo compacto: apenas o essencial para o sistema prompt base
+      var [v, cStats] = await Promise.all([
+        sb.from('vagas').select('titulo,area,modalidade').eq('empresa_id',EMPRESA_ID).eq('status','ativa'),
+        sb.from('candidaturas').select('etapa,score_ia')
       ]);
-      var topCands = (c.data||[]).slice(0,5).map(x=>`${x.candidato_nome}(${x.score_ia||'?'}% - ${etapaLabel(x.etapa)})`).join(', ');
-      ctx = `Vagas ativas: ${v.count||0} (${(v.data||[]).map(x=>x.titulo).join(', ')})\nTotal candidaturas: ${c.count||0}\nTop candidatos: ${topCands}`;
+      var vagas = v.data || [];
+      var cands = cStats.data || [];
+      var totalCands = cands.length;
+      var scores = cands.filter(c=>c.score_ia!=null).map(c=>c.score_ia);
+      var scoreMedia = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+      var taxaAprov = totalCands ? Math.round(cands.filter(c=>c.etapa!='inscrito'&&c.etapa!='reprovado').length/totalCands*100) : 0;
+      // Contagem por etapa
+      var porEtapa = {};
+      cands.forEach(c=>{ porEtapa[c.etapa]=(porEtapa[c.etapa]||0)+1; });
+      var etapasStr = Object.entries(porEtapa).map(([e,n])=>`${etapaLabel(e)}:${n}`).join(', ');
+      ctx = [
+        `Vagas abertas: ${vagas.length} (${vagas.map(v=>v.titulo).join(', ')})`,
+        `Candidatos: ${totalCands} | Score médio: ${scoreMedia}% | Taxa aprovação: ${taxaAprov}%`,
+        `Pipeline: ${etapasStr}`
+      ].join('\n');
     } catch(e) { ctx = 'Erro ao carregar contexto'; }
   }
   iaContext = ctx;
   el.innerHTML = ctx.split('\n').map(l=>`<div style="padding:3px 0;border-bottom:1px solid var(--border)">${l}</div>`).join('');
+}
+
+// Carrega dados extras do banco conforme palavras-chave da pergunta
+async function loadIAContextDinamico(pergunta) {
+  if (demoMode) return '';
+  var p = pergunta.toLowerCase();
+  var extra = [];
+  try {
+    // Candidatos com maior score
+    if (/score|melhor|top|qualific|ranking/.test(p)) {
+      var r = await sb.from('v_pipeline').select('candidato_nome,vaga_titulo,etapa,score_ia').order('score_ia',{ascending:false}).limit(8);
+      if (r.data?.length) extra.push('Top candidatos por score:\n' + r.data.map(x=>`  ${x.candidato_nome} | ${x.vaga_titulo} | ${etapaLabel(x.etapa)} | ${x.score_ia||'?'}%`).join('\n'));
+    }
+    // Entrevistas
+    if (/entrevista|agenda|semana|hoje/.test(p)) {
+      var hoje = new Date(); var proxSemana = new Date(); proxSemana.setDate(hoje.getDate()+7);
+      var r = await sb.from('entrevistas').select('data_hora,tipo,formato,candidaturas(candidatos(nome),vagas(titulo))').gte('data_hora',hoje.toISOString()).lte('data_hora',proxSemana.toISOString()).order('data_hora').limit(10);
+      if (r.data?.length) extra.push('Entrevistas próximos 7 dias:\n' + r.data.map(e=>{
+        var dt = new Date(e.data_hora).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+        var nome = e.candidaturas?.candidatos?.nome || '?';
+        var vaga = e.candidaturas?.vagas?.titulo || '?';
+        return `  ${dt} | ${nome} | ${vaga} | ${e.tipo}`;
+      }).join('\n'));
+    }
+    // Vagas com mais candidatos
+    if (/vaga|posição|cargo|aberta/.test(p)) {
+      var r = await sb.from('vagas').select('titulo,area,modalidade,requisitos').eq('empresa_id',EMPRESA_ID).eq('status','ativa').limit(10);
+      if (r.data?.length) extra.push('Vagas abertas detalhadas:\n' + r.data.map(v=>`  ${v.titulo} | ${v.area} | ${v.modalidade}`).join('\n'));
+    }
+    // Ofertas/contratações
+    if (/oferta|contrat|propost|salário/.test(p)) {
+      var r = await sb.from('ofertas').select('salario_proposto,status,candidaturas(candidatos(nome),vagas(titulo))').order('created_at',{ascending:false}).limit(5);
+      if (r.data?.length) extra.push('Ofertas recentes:\n' + r.data.map(o=>`  ${o.candidaturas?.candidatos?.nome||'?'} | ${o.candidaturas?.vagas?.titulo||'?'} | R$ ${(o.salario_proposto||0).toLocaleString('pt-BR')} | ${o.status}`).join('\n'));
+    }
+    // Reprovados / taxa
+    if (/reprov|taxa|aprov|conversão/.test(p)) {
+      var r = await sb.from('candidaturas').select('etapa');
+      if (r.data) {
+        var total = r.data.length, reprov = r.data.filter(c=>c.etapa==='reprovado').length, contrat = r.data.filter(c=>c.etapa==='contratado').length;
+        extra.push(`Estatísticas: ${total} candidaturas | ${reprov} reprovados (${Math.round(reprov/total*100)}%) | ${contrat} contratados`);
+      }
+    }
+  } catch(e) { /* silencioso */ }
+  return extra.join('\n\n');
 }
 
 // Detecta se está rodando via servidor (local ou Railway) ou arquivo direto
@@ -2457,18 +2517,53 @@ async function sendAI() {
   var inp = document.getElementById('ai-input'), msg = inp.value.trim();
   if (!msg) return;
   inp.value = '';
-  var msgs = document.getElementById('chat-msgs');
-  msgs.innerHTML += `<div style="align-self:flex-end;max-width:85%"><div style="background:var(--accent);color:#fff;border-radius:10px 10px 4px 10px;padding:8px 12px;font-size:12px;line-height:1.6">${msg}</div></div>`;
-  msgs.innerHTML += `<div style="align-self:flex-start;max-width:85%" id="ai-typing"><div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;color:var(--muted)">Analisando...</div></div>`;
-  msgs.scrollTop = msgs.scrollHeight;
+  var msgsEl = document.getElementById('chat-msgs');
+  msgsEl.innerHTML += `<div style="align-self:flex-end;max-width:85%"><div style="background:var(--accent);color:#fff;border-radius:10px 10px 4px 10px;padding:8px 12px;font-size:12px;line-height:1.6">${escHTML(msg)}</div></div>`;
+  msgsEl.innerHTML += `<div style="align-self:flex-start;max-width:85%" id="ai-typing"><div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;color:var(--muted)">Analisando...</div></div>`;
+  msgsEl.scrollTop = msgsEl.scrollHeight;
   try {
-    var system = `Você é um assistente de RH especializado. Responda em português brasileiro, seja objetivo e use emojis para organizar visualmente. Contexto atual do banco de dados:\n${iaContext}`;
-    var reply = await callAI(system, msg, 600);
+    // Contexto dinâmico extra baseado em palavras-chave da pergunta
+    var ctxExtra = await loadIAContextDinamico(msg);
+    var system = `Você é um assistente de RH especializado. Responda em português brasileiro, seja objetivo e use emojis para organizar visualmente. Seja conciso (máx 5-6 linhas por resposta).\n\nDados do sistema:\n${iaContext}${ctxExtra ? '\n\n'+ctxExtra : ''}`;
+
+    // Adiciona mensagem do usuário ao histórico
+    iaChatHistory.push({role:'user', content: msg});
+
+    // Mantém no máximo 10 turnos (20 mensagens) para não explodir o contexto
+    if (iaChatHistory.length > 20) iaChatHistory = iaChatHistory.slice(-20);
+
+    // Chama a API com histórico completo
+    var r = await fetch(AI_ENDPOINT, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',   // haiku: 5-10x mais barato que sonnet, suficiente para chat
+        max_tokens: 500,
+        system: system,
+        messages: iaChatHistory
+      })
+    });
+    if (!r.ok) { var err = await r.json().catch(()=>({})); throw new Error(err.error||'Erro na API'); }
+    var d = await r.json();
+    var reply = d.content[0].text;
+
+    // Adiciona resposta ao histórico
+    iaChatHistory.push({role:'assistant', content: reply});
+
     document.getElementById('ai-typing').innerHTML = `<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;line-height:1.6">${reply.replace(/\n/g,'<br>')}</div>`;
   } catch(e) {
+    iaChatHistory.pop(); // remove mensagem do usuário se deu erro
     document.getElementById('ai-typing').innerHTML = `<div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;color:var(--danger)">Erro: ${e.message}</div>`;
   }
-  msgs.scrollTop = msgs.scrollHeight;
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+function escHTML(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function limparChatIA() {
+  iaChatHistory = [];
+  var el = document.getElementById('chat-msgs');
+  if (el) el.innerHTML = `<div style="align-self:flex-start;max-width:85%"><div style="background:var(--bg);border-radius:4px 10px 10px 10px;padding:8px 12px;font-size:12px;color:var(--muted)">Olá! Sou seu assistente de RH. Como posso ajudar? 👋</div></div>`;
 }
 
 function askAIWithContext(p) {
